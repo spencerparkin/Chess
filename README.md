@@ -1,2 +1,3 @@
 # Chess
-A web-app implementation of Chess.
+
+This is my attempt to implement the game of Chess as a web-app.  I've decided to use CSS grid, HTML drag-and-drop, and React.  A Python server will handle the serving of just one page (the game page), and then a bunch of AJAX requests.  The server will be backed by a Mongo database.  Each document in a collection will store the state of a single game by name.  The game page shows the board, which game you're choosing to view (by name), and which player you're choosing to be (black or white).  A web-socket might be used to let the server tell the client when it needs to update state.  It might be simpler, however, to let the game page send out an AJAX request that does not get answered until the state changes.  If time-outs are an issue, this request can be continued to be made over rand over.  In any case, the goal is for the game to update state for both players as fast as either makes a move.
