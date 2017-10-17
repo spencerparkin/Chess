@@ -1,0 +1,26 @@
+#chess_board {
+	display: grid;
+	grid-template-rows: 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5%;
+	grid-template-columns: 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5%;
+	grid-gap: 0px;
+	width: 800px;
+	height: 800px;
+}
+
+.tile {
+	z-index: 0;
+}
+
+.occupant {
+	z-index: 1;
+}
+
+.white_tile {
+	background-color: white;
+	background-image: url( "images/white_tile.jpg" );
+}
+
+.black_tile {
+	background-color: black;
+	background-image: url( "images/black_tile.jpg" );
+}
