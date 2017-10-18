@@ -10,3 +10,5 @@ is valid.  Valid landing spots may be drawn green, while those invalid, red.  I 
 feedback is to have a request that, given a piece, tells you all valid target locations for that piece.  The javascript can
 then use that cached information during dragging to toggle highlights.  Use "observables" to do AJAX stuff?  Can I cancel
 these kinds of requests?  I may need to.
+
+TODO: If player is "black", flip the board when rendering it.
