@@ -1,3 +1,14 @@
+body, option, select {
+    font-family: "Courier New";
+}
+
+select {
+    padding: 10px 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #f1f1f1;
+}
+
 #chess_board {
 	display: grid;
 	grid-template-rows: 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5% 12.5%;
