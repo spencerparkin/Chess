@@ -29,6 +29,7 @@ var OnNewButtonClicked = function() {
 var OnDeleteButtonClicked = function() {
     var game_dropdown = document.getElementById( 'game' );
     var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    // TODO: Prompt before deleting.
     $.getJSON( 'delete_game', { 'game_name' : game_name }, function( json_data ) {
         if( json_data.error ) {
             alert( json_data.error );
@@ -52,6 +53,20 @@ var RefreshGame = function() {
 
 var OnRefreshButtonClicked = function() {
     RefreshGame();
+}
+
+var WaitForTurn = function() {
+    if( chess_board.state.playing_as !== 2 /* both */ ) {
+        $.ajax( { url: 'wait_for_turn', dataType: 'json', data: { 'game_name' : game_name, 'turn' : chess_board.state.playing_as }, function( request, status, json_data ) {
+            if( json_data.error === 'timeout' || status === 'timeout' ) {
+                WaitForTurn();
+            } else if( json_data.error ) {
+                alert( json_data.error );
+            } else {
+                RefreshGame();
+            }
+        }, timeout: 5000 } );
+    }
 }
 
 var OnPlayerDropdownChanged = function() {

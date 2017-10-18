@@ -3,6 +3,7 @@
 import os
 import cherrypy
 import pymongo
+import time
 
 class ChessGame( object ):
     EMPTY = 0
@@ -132,6 +133,25 @@ class ChessApp( object ):
     @cherrypy.tools.json_out()
     def all_valid_moves( self, **kwargs ):
         pass # TODO: Return all valid moves for the given piece.
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def wait_for_turn( self, **kwargs ):
+        try:
+            game_name = kwargs[ 'game_name' ]
+            turn = kwargs[ 'turn' ]
+            for i in range( 1000 ):
+                game_doc = self.game_collection.find_one( { 'game_name' : game_name } )
+                game = ChessGame()
+                game.Deserialize( game_doc )
+                if game.whose_turn != turn:
+                    time.sleep(0.5)
+                else:
+                    return {}
+            else:
+                raise Exception( 'timeout' )
+        except Exception as ex:
+            return { 'error' : str(ex) }
 
 if __name__ == '__main__':
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
