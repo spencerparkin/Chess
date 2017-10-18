@@ -29,14 +29,15 @@ var OnNewButtonClicked = function() {
 var OnDeleteButtonClicked = function() {
     var game_dropdown = document.getElementById( 'game' );
     var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
-    // TODO: Prompt before deleting.
-    $.getJSON( 'delete_game', { 'game_name' : game_name }, function( json_data ) {
-        if( json_data.error ) {
-            alert( json_data.error );
-        } else {
-            RepopulateGameDropdown();
-        }
-    } );
+    if( confirm( 'Delete game by the name "' + game_name + '"?' ) ) {
+        $.getJSON( 'delete_game', { 'game_name' : game_name }, function( json_data ) {
+            if( json_data.error ) {
+                alert( json_data.error );
+            } else {
+                RepopulateGameDropdown();
+            }
+        } );
+    }
 }
 
 var RefreshGame = function() {
