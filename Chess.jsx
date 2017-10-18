@@ -56,18 +56,24 @@ var OnRefreshButtonClicked = function() {
     RefreshGame();
 }
 
-var WaitForTurn = function() {
-    if( chess_board.state.playing_as !== 2 /* both */ ) {
-        $.ajax( { url: 'wait_for_turn', dataType: 'json', data: { 'game_name' : game_name, 'turn' : chess_board.state.playing_as }, function( request, status, json_data ) {
-            if( json_data.error === 'timeout' || status === 'timeout' ) {
-                WaitForTurn();
-            } else if( json_data.error ) {
+// TODO: Use web-socket to know when to refresh when opponent takes turn?
+
+var MakeMove = function( move ) {
+    var game_dropdown = document.getElementById( 'game' );
+    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    $.ajax( {
+        url: 'make_move',
+        data: JSON.stringify( { 'game_name' : game_name, 'move' : move, 'playing_as' : chess_board.state.playing_as } ),
+        contentType: 'application/json',
+        type: 'POST',
+        success: function( json_data ) {
+            if( json_data.error ) {
                 alert( json_data.error );
             } else {
                 RefreshGame();
             }
-        }, timeout: 5000 } );
-    }
+        }
+    } );
 }
 
 var OnPlayerDropdownChanged = function() {
@@ -105,6 +111,28 @@ class ChessBoardTile extends React.Component {
         super( props );
     }
 
+    OnDragStart( evt ) {
+        // TODO: Here we might AJAX for all possible moves of peice and then cache that info away for mouse-over effects.
+        evt.dataTransfer.setData( 'source_id', evt.target.parentElement.id );
+    }
+
+    OnDragOver( evt ) {
+        evt.preventDefault(); // Say we allow dropping here?
+    }
+
+    OnDrop( evt ) {
+        evt.preventDefault();
+        var source_id = evt.dataTransfer.getData( 'source_id' );
+        var source_loc = /([0-9])_([0-9])/g.exec( source_id );
+        var target_id = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement.id : evt.target.id;
+        var target_loc = /([0-9])_([0-9])/g.exec( target_id );
+        var move = {
+            source: [ parseInt( source_loc[1] ), parseInt( source_loc[2] ) ],
+            target: [ parseInt( target_loc[1] ), parseInt( target_loc[2] ) ]
+        }
+        MakeMove( move );
+    }
+
     render() {
         var parity = ( this.props.row + this.props.col ) % 2;
         var style = {
@@ -124,10 +152,10 @@ class ChessBoardTile extends React.Component {
         var occupant = this.props.matrix[i][j];
         if( occupant !== 0 ) {
             var occupant_image = this.getOccupantImage( occupant );
-            var occupant_div = <img draggable={true} className="occupant" src={'images/' + occupant_image + '.png'} width={100} height={100}></img>;
+            var occupant_div = <img draggable={true} onDragStart={this.OnDragStart.bind(this)} className="occupant" src={'images/' + occupant_image + '.png'} width={100} height={100}></img>;
             tile_occupants.push( occupant_div );
         }
-        return React.createElement( 'div', { id: id, style: style, className: tileClass }, ...tile_occupants );
+        return React.createElement( 'div', { id: id, style: style, className: tileClass, onDrop: this.OnDrop.bind(this), onDragOver: this.OnDragOver.bind(this), ref: 'tile' }, ...tile_occupants );
     }
 
     getOccupantImage( occupant ) {

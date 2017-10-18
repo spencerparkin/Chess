@@ -4,6 +4,7 @@ import os
 import cherrypy
 import pymongo
 import time
+import json
 
 class ChessGame( object ):
     EMPTY = 0
@@ -35,6 +36,7 @@ class ChessGame( object ):
         ]
         self.whose_turn = self.WHITE_PLAYER;
         self.move_count = 0
+        # TODO: We might keep a history of all the moves that were made, and then allow for undo/redo.
 
     def Serialize( self ):
         data = {
@@ -47,11 +49,76 @@ class ChessGame( object ):
         self.matrix = data[ 'matrix' ]
         self.whose_turn = data[ 'whose_turn' ]
 
+    def ColorOfOccupant( self, occupant ):
+        if occupant >= 1 and occupant <= 6:
+            return self.WHITE_PLAYER
+        elif occupant >= 7 and occupant <= 12:
+            return self.BLACK_PLAYER
+        return None
+
     def ValidMove( self, move ):
-        pass
+        move_source = move[ 'source' ]
+        move_target = move[ 'target' ]
+        # Notice that here we're also making sure that the coordinates are in bound by trying to use them on the matrix.
+        source_occupant = self.matrix[ move_source[0] ][ move_source[1] ]
+        target_occupant = self.matrix[ move_target[0] ][ move_target[1] ]
+        if move_source[0] == move_target[0] and move_source[1] == move_target[1]:
+            raise Exception( 'Zero-length moves not allowed.' )
+        if source_occupant == self.EMPTY:
+            raise Exception( 'No piece to move.' )
+        source_color = self.ColorOfOccupant( source_occupant )
+        if source_color != self.whose_turn:
+            raise Exception( 'Piece cannot be moved on this turn.' )
+        target_color = self.ColorOfOccupant( target_occupant )
+        if target_color and target_color == self.whose_turn:
+            raise Exception( 'Piece cannot capture one of its own kind.' )
+        row_diff = move_target[0] - move_source[0]
+        col_diff = move_target[1] - move_source[1]
+        if source_occupant == self.WHITE_KING or source_occupant == self.BLACK_KING:
+            if abs( row_diff ) > 1 or abs( col_diff ) > 1:
+                raise Exception( 'The king cannot move that far.' )
+        elif source_occupant == self.WHITE_QUEEN or source_occupant == self.BLACK_QUEEN:
+            if abs( row_diff ) != 0 and abs( col_diff ) != 0 and abs( row_diff ) != abs( col_diff ):
+                raise Exception( 'The queen can only move on diagonals or orthogonals.' )
+        elif source_occupant == self.WHITE_BISHOP or source_occupant == self.BLACK_BISHOP:
+            if abs( row_diff ) != abs( col_diff ):
+                raise Exception( 'Bishops can only move on diagonals.' )
+        elif source_occupant == self.WHITE_ROOK or source_occupant == self.BLACK_ROOK:
+            if abs( row_diff ) != 0 and abs( col_diff ) != 0:
+                raise Exception( 'Rooks can only move on orthogonals.' )
+        elif source_occupant == self.WHITE_KNIGHT or source_occupant == self.BLACK_KNIGHT:
+            if not( ( abs( row_diff ) == 1 and abs( col_diff ) == 2 ) or ( abs( row_diff ) == 2 and abs( col_diff ) == 1 ) ):
+                raise Exception( 'Knights can only move on an L-shape.' )
+        elif source_occupant == self.WHITE_PAWN or source_occupant == self.BLACK_PAWN:
+            sign = -1 if source_occupant == self.WHITE_PAWN else 1
+            first_file = 6 if source_occupant == self.WHITE_PAWN else 1
+            if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color and target_color != self.EMPTY:
+                raise Exception( 'Pawns can only attack on diagonals.' )
+            if row_diff == 2 * sign and col_diff == 0:
+                if move_source[0] != first_file:
+                    raise Exception( 'A pawn can only move 2 tiles from the first file.' )
+                if self.matrix[ move_source[0] + sign ][ move_source[1] ] != self.EMPTY:
+                    raise Exception( 'A pawn can only move 2 tiles from the first file if the tile skipped is unoccupied.' )
+            elif row_diff == 1 * sign and col_diff == 0:
+                pass
+            elif row_diff == 1 * sign and abs( col_diff ) == 1:
+                if target_color == None:
+                    raise Exception( 'A pawn can only move diagonally if it is going to attack.' )
+            else:
+                raise Exception( 'Pawns can only move orthogonally one tile if advancing, or diagonally one tile if attacking.  In any case, pawns must always move toward the enemy\'s side.' )
 
     def MakeMove( self, move ):
-        pass
+        self.ValidMove( move )
+        move_source = move[ 'source' ]
+        move_target = move[ 'target' ]
+        occupant = self.matrix[ move_source[0] ][ move_source[1] ]
+        if occupant == self.WHITE_PAWN and move_target[0] == 0:
+            occupant = self.WHITE_QUEEN # TODO: They should actually get to choose between this and other pieces.
+        elif occupant == self.BLACK_PAWN and move_target[0] == 7:
+            occupant = self.BLACK_QUEEN # TODO: Again, they should actually get to choose here.
+        self.matrix[ move_target[0] ][ move_target[1] ] = occupant
+        self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY;
+        self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
 
 class ChessApp( object ):
     def __init__( self, root_dir ):
@@ -117,14 +184,24 @@ class ChessApp( object ):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def make_move( self, **kwargs ):
-        game_name = kwargs[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name': game_name } )
-        if not game_doc:
-            return { 'error': 'A game by the name "%s" could not be found.' % game_name }
-        game = ChessGame()
-        game.Deserialize( game_doc[ 'game_data'] )
         try:
-            pass # TODO: Make the move on the game object, reserialize it, then upload it to the database.
+            content_length = cherrypy.request.headers[ 'Content-Length' ]
+            payload = cherrypy.request.body.read( int( content_length ) )
+            payload = payload.decode( 'utf-8' )
+            payload = json.loads( payload )
+            game_name = payload[ 'game_name' ]
+            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+            if not game_doc:
+                return { 'error': 'A game by the name "%s" could not be found.' % game_name }
+            game = ChessGame()
+            game.Deserialize( game_doc[ 'game_data'] )
+            if game.whose_turn != payload[ 'playing_as' ] and payload[ 'playing_as' ] != 2: # 2 -> Playing as both black and white.
+                raise Exception( 'It is not yet your turn.' )
+            move = payload[ 'move' ]
+            game.MakeMove( move )
+            game_data = game.Serialize()
+            result = self.game_collection.update_one( { 'game_name': game_name }, { '$set' : { 'game_data' : game_data } } )
+            result = None
         except Exception as ex:
             return { 'error' : str(ex) }
         return {}
@@ -133,25 +210,6 @@ class ChessApp( object ):
     @cherrypy.tools.json_out()
     def all_valid_moves( self, **kwargs ):
         pass # TODO: Return all valid moves for the given piece.
-
-    @cherrypy.expose
-    @cherrypy.tools.json_out()
-    def wait_for_turn( self, **kwargs ):
-        try:
-            game_name = kwargs[ 'game_name' ]
-            turn = kwargs[ 'turn' ]
-            for i in range( 1000 ):
-                game_doc = self.game_collection.find_one( { 'game_name' : game_name } )
-                game = ChessGame()
-                game.Deserialize( game_doc )
-                if game.whose_turn != turn:
-                    time.sleep(0.5)
-                else:
-                    return {}
-            else:
-                raise Exception( 'timeout' )
-        except Exception as ex:
-            return { 'error' : str(ex) }
 
 if __name__ == '__main__':
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
