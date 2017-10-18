@@ -54,6 +54,12 @@ var OnRefreshButtonClicked = function() {
     RefreshGame();
 }
 
+var OnPlayerDropdownChanged = function() {
+    var player_dropdown = document.getElementById( 'player_dropdown' );
+    var playing_as = parseInt( player_dropdown.options[ player_dropdown.selectedIndex ].value );
+    chess_board.setState( { playing_as: playing_as } );
+}
+
 class GameDropdown extends React.Component {
     constructor( props ) {
         super( props );
@@ -86,7 +92,7 @@ class ChessBoardTile extends React.Component {
     render() {
         var parity = ( this.props.row + this.props.col ) % 2;
         var style = {
-            gridRow: this.props.row,
+            gridRow: this.props.flip ? ( 9 - this.props.row ) : this.props.row,
             gridColumn: this.props.col
         };
         var tileClass = 'tile ';
@@ -141,19 +147,48 @@ class ChessBoard extends React.Component {
                 [ 0, 0, 0, 0, 0, 0, 0, 0 ],
                 [ 0, 0, 0, 0, 0, 0, 0, 0 ],
                 [ 0, 0, 0, 0, 0, 0, 0, 0 ]
-            ]
+            ],
+            whose_turn: undefined,
+            playing_as: 0
         }
     }
 
     render() {
+        var flip = false;
+        if( this.state.playing_as === 2 /* both */ ) {
+            if( this.state.whose_turn === 1 /* black */ ) {
+                flip = true;
+            }
+        } else {
+            if( this.state.playing_as === 1 /* black */ ) {
+                flip = true;
+            }
+        }
         var tile_array = [];
         for( var row = 1; row <= 8; row++ ) {
             for( var col = 1; col <= 8; col++ ) {
-                var tile = <ChessBoardTile row={row} col={col} matrix={this.state.matrix}/>;
+                var tile = <ChessBoardTile row={row} col={col} matrix={this.state.matrix} flip={flip}/>;
                 tile_array.push( tile );
             }
         }
-        return React.createElement( 'div', { id: 'chess_board' }, ...tile_array );
+        var style = { border: '5px solid black' };
+        var chess_board_div = React.createElement( 'div', { id: 'chess_board', style: style }, ...tile_array );
+        var whose_turn = '';
+        if( this.state.whose_turn !== undefined ) {
+            whose_turn = 'It is ' + ( this.state.whose_turn === 0 ? 'white' : 'black' ) + "'s turn.";
+            if( this.state.playing_as === this.state.whose_turn ) {
+                whose_turn += '  It is your turn.';
+            } else if( this.state.playing_as === 2 /* both */ ) {
+                whose_turn += '  Your are both white and black.  Take the turn.';
+            } else {
+                whose_turn += '  It is not yet your turn.';
+            }
+        } else {
+            whose_turn = "It is no one's turn yet.";
+        }
+        style = { width: '800px' };
+        var whose_turn_div = <center><p style={style}>{whose_turn}</p></center>;
+        return React.createElement( 'div', null, whose_turn_div, chess_board_div );
     }
 }
 

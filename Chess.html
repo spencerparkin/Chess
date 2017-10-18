@@ -20,14 +20,14 @@
 					<span id="game_dropdown_span">
 					</span>
 					<label for="player_dropdown">Player:</label>
-					<select id="player_dropdown">
-						<option value="white">White</option>
-						<option value="black">Black</option>
-						<option value="both">Both</option>
+					<select id="player_dropdown" onchange="OnPlayerDropdownChanged()">
+						<option value="0">White</option>
+						<option value="1">Black</option>
+						<option value="2">Both</option>
 					</select>
 				</form>
 			</p>
-			<div id="chess_board" style="border: 5px solid black;">
+			<div id="chess_board">
 			</div>
 		</center>
 	</body>
