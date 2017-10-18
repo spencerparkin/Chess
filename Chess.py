@@ -111,7 +111,7 @@ class ChessApp( object ):
         game_doc = self.game_collection.find_one( { 'game_name': game_name } )
         if not game_doc:
             return { 'error' : 'A game by the name "%s" could not be found.' % game_name }
-        return game_doc[ 'game_data' ]
+        return { 'game_state': game_doc[ 'game_data' ] }
 
     @cherrypy.expose
     @cherrypy.tools.json_out()

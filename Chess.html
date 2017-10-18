@@ -8,6 +8,7 @@
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.14.0/babel.min.js"></script>
 		<script type="text/babel" data-presets="es2017, stage-3" data-plugins="syntax-async-functions,transform-class-properties"></script>
 		<script src="https://code.jquery.com/jquery.js"></script>
+		<script type="text/babel" src="Chess.jsx"></script>
 	</head>
 	<body>
 		<center>
@@ -15,11 +16,11 @@
 				<form>
 					<input type="button" onclick="OnNewButtonClicked()" value="New"></input>
 					<input type="button" onclick="OnDeleteButtonClicked()" value="Delete"></input>
-					<label for="game">Game:</label>
-					<select id="game" onchange="OnGameSelectChanged()">
-					</select>
-					<label for="player">Player:</label>
-					<select id="player">
+					<label for="game_dropdown_span">Game:</label>
+					<span id="game_dropdown_span">
+					</span>
+					<label for="player_dropdown">Player:</label>
+					<select id="player_dropdown">
 						<option value="white">White</option>
 						<option value="black">Black</option>
 						<option value="both">Both</option>
@@ -29,6 +30,5 @@
 			<div id="chess_board" style="border: 5px solid black;">
 			</div>
 		</center>
-		<script type="text/babel" src="Chess.jsx"></script>
 	</body>
 </html>
