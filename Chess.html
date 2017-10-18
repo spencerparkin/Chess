@@ -13,8 +13,10 @@
 		<center>
 			<p>
 				<form>
+					<input type="button" onclick="OnNewButtonClicked()" value="New"></input>
+					<input type="button" onclick="OnDeleteButtonClicked()" value="Delete"></input>
 					<label for="game">Game:</label>
-					<select id="game">
+					<select id="game" onchange="OnGameSelectChanged()">
 					</select>
 					<label for="player">Player:</label>
 					<select id="player">

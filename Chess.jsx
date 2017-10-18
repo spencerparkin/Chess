@@ -1,5 +1,70 @@
 // Chess.jsx
 
+var RepopulateGameDropdown = function() {
+    $.getJSON( 'game_list', {}, function( json_data ) {
+        game_dropdown = document.getElementById( 'game' );
+        if( json_data.error ) {
+            alert( json_data.error );
+        } else {
+            while( game_dropdown.firstChild ) {
+                game_dropdown.removeChild( game_dropdown.firstChild );
+            }
+            for( var i = 0; i < json_data.game_list; i++ ) {
+                var op = document.createElement( 'option' );
+                game_name = json_data.game_list[i];
+                op.textContent = game_name;
+                op.value = game_name;
+                game_dropdown.appendChild( op );
+            }
+        }
+    } );
+}
+
+var OnPageLoad = function() {
+    RepopulateGameDropdown();
+}
+
+var OnNewButtonClicked = function() {
+    game_name = prompt( 'Please enter a name for your new game.', '' );
+    if( game_name ) {
+        $.getJSON( 'new_game', { 'game_name' : game_name }, function( json_data ) {
+            if( json_data.error ) {
+                alert( json_data.error );
+            } else {
+                RepopulateGameDropdown();
+            }
+        } );
+    }
+}
+
+var OnDeleteButtonClicked = function() {
+    game_dropdown = document.getElementById( 'game' );
+    game_name = game_dropdown.options[ game_dropdown.selectedIndex ];
+    $.getJSON( 'delete_game', { 'game_name' : game_name }, function( json_data ) {
+        if( json_data.error ) {
+            alert( json_data.error );
+        } else {
+            RepopulateGameDropdown();
+        }
+    } );
+}
+
+var OnGameSelectChanged = function() {
+    RefreshGame();
+}
+
+var RefreshGame = function() {
+    game_dropdown = document.getElementById( 'game' );
+    game_name = game_dropdown.options[ game_dropdown.selectedIndex ];
+    $.getJSON( 'game_state', { 'game_name' : game_name }, function( json_data ) {
+        if( json_data.error ) {
+            alert( json_data.error );
+        } else {
+            chess_board.setState( json_data.game_state );
+        }
+    } );
+}
+
 class ChessBoardTile extends React.Component {
     constructor( props ) {
         super( props );
@@ -79,4 +144,4 @@ class ChessBoard extends React.Component {
     }
 }
 
-ReactDOM.render( <ChessBoard/>, document.getElementById( 'chess_board' ) );
+var chess_board = ReactDOM.render( <ChessBoard/>, document.getElementById( 'chess_board' ) );
