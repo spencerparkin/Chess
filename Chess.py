@@ -2,12 +2,21 @@
 
 import os
 import cherrypy
+import pymongo
 
 class ChessApp( object ):
     def __init__( self, root_dir ):
         self.root_dir = root_dir
-
-        # TODO: Cache mongo collection here.
+        try:
+            database_uri = 'mongodb://heroku_8m3rxx28:password@ds121665.mlab.com:21665/heroku_8m3rxx28'
+            self.mongo_client = pymongo.MongoClient( database_uri )
+            self.database = self.mongo_client[ 'heroku_8m3rxx28' ]
+            collection_names = self.database.collection_names()
+            if not 'game_collection' in collection_names:
+                self.database.create_collection( 'game_collection' )
+            self.game_collection = self.database[ 'game_collection' ]
+        except:
+            self.mongo_client = None
 
     @cherrypy.expose
     def default( self, **kwargs ):
