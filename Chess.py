@@ -37,6 +37,7 @@ class ChessGame( object ):
         self.whose_turn = self.WHITE_PLAYER;
         self.move_count = 0
         # TODO: We might keep a history of all the moves that were made, and then allow for undo/redo.
+        #       Even if we don't do undo/redo, it would be very nice to see a history of moves made as a side-bar.
 
     def Serialize( self ):
         data = {

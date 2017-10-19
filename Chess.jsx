@@ -138,7 +138,7 @@ class ChessBoardTile extends React.Component {
         var parity = ( this.props.row + this.props.col ) % 2;
         var style = {
             gridRow: this.props.flip ? ( 9 - this.props.row ) : this.props.row,
-            gridColumn: this.props.col
+            gridColumn: this.props.flip ? ( 9 - this.props.col ) : this.props.col
         };
         var tileClass = 'tile ';
         if( parity === 0 ) {
