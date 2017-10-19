@@ -107,9 +107,13 @@ class GameDropdown extends React.Component {
     }
 }
 
+var highlighted_tile_id = undefined; // Ick!  A global!
+var valid_move_list = undefined; // Ugh...and another.
+
 class ChessBoardTile extends React.Component {
     constructor( props ) {
         super( props );
+        this.highlighted_tile_id = undefined;
     }
 
     GetLocationFromId( id ) {
@@ -119,7 +123,21 @@ class ChessBoardTile extends React.Component {
 
     OnDragStart( evt ) {
         if( evt.target.tagName === 'IMG' ) {
-            evt.dataTransfer.setData( 'source_id', evt.target.parentElement.id );
+            valid_move_list = undefined;
+            var source_id = evt.target.parentElement.id;
+            evt.dataTransfer.setData( 'source_id', source_id );
+            var source_loc = this.GetLocationFromId( source_id );
+            $.ajax( {
+                url: 'all_valid_moves',
+                data: JSON.stringify( { game_name: GetGameName(), location: source_loc } ),
+                contentType: 'application/json',
+                type: 'POST',
+                success: function( json_data ) {
+                    valid_move_list = json_data.valid_move_list.map( function( move ) {
+                        return move.target;
+                    } );
+                }
+            } );
         } else {
             // Don't allow drag somehow?
         }
@@ -138,20 +156,42 @@ class ChessBoardTile extends React.Component {
         MakeMove( move );
     }
 
-    OnDragEnter( evt ) {
-        /*var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
-        if( !tile_div.classList.contains( 'tile_move_good' ) ) {
-            tile_div.classList.add( 'tile_move_good' );
-            console.log( 'added: ' + tile_div.id );
-        }*/
+    OnDragEnd( evt ) {
+        this.ClearHighlightedTile();
     }
 
-    OnDragLeave( evt ) {
-        /*var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
-        if( tile_div.classList.contains( 'tile_move_good' ) ) {
+    ClearHighlightedTile() {
+        if( highlighted_tile_id !== undefined ) {
+            var tile_div = document.getElementById( highlighted_tile_id );
             tile_div.classList.remove( 'tile_move_good' );
-            console.log( 'removed: ' + tile_div.id );
-        }*/
+            tile_div.classList.remove( 'tile_move_bad' );
+            highlighted_tile_id = undefined;
+        }
+    }
+
+    IsValidMove( move ) {
+        for( var i = 0; i < valid_move_list.length; i++ ) {
+            var valid_move = valid_move_list[i];
+            if( valid_move[0] === move[0] && valid_move[1] === move[1] ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    OnDragEnter( evt ) {
+        this.ClearHighlightedTile();
+        var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
+        var target_id = tile_div.id;
+        var target_loc = this.GetLocationFromId( target_id );
+        if( valid_move_list !== undefined ) {
+            if( this.IsValidMove( target_loc ) ) {
+                tile_div.classList.add( 'tile_move_good' );
+            } else {
+                tile_div.classList.add( 'tile_move_bad' );
+            }
+            highlighted_tile_id = tile_div.id;
+        }
     }
 
     render() {
@@ -183,7 +223,7 @@ class ChessBoardTile extends React.Component {
             onDrop: this.OnDrop.bind(this),
             onDragOver: this.OnDragOver.bind(this),
             onDragEnter: this.OnDragEnter.bind(this),
-            onDragLeave: this.OnDragLeave.bind(this),
+            onDragEnd: this.OnDragEnd.bind(this),
             ref: 'tile'
         }, ...tile_occupants );
     }

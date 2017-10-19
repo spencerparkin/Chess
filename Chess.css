@@ -18,7 +18,7 @@ select {
 }
 
 .tile_move_good {
-    border: 5px solid green;
+    border: 5px solid lime;
 }
 
 .tile_move_bad {

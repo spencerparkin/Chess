@@ -71,7 +71,7 @@ class ChessGame( object ):
         if source_color != self.whose_turn:
             raise Exception( 'Piece cannot be moved on this turn.' )
         target_color = self.ColorOfOccupant( target_occupant )
-        if target_color and target_color == self.whose_turn:
+        if target_color is not None and target_color == self.whose_turn:
             raise Exception( 'Piece cannot capture one of its own kind.' )
         row_diff = move_target[0] - move_source[0]
         col_diff = move_target[1] - move_source[1]
@@ -93,7 +93,7 @@ class ChessGame( object ):
         elif source_occupant == self.WHITE_PAWN or source_occupant == self.BLACK_PAWN:
             sign = -1 if source_occupant == self.WHITE_PAWN else 1
             first_file = 6 if source_occupant == self.WHITE_PAWN else 1
-            if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color and target_color != self.EMPTY:
+            if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color is not None and target_color != self.EMPTY:
                 raise Exception( 'Pawns can only attack on diagonals.' )
             if row_diff == 2 * sign and col_diff == 0:
                 if move_source[0] != first_file:
@@ -130,6 +130,22 @@ class ChessGame( object ):
         self.matrix[ move_target[0] ][ move_target[1] ] = occupant
         self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY;
         self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
+
+    def EveryTileLocation( self ):
+        for i in range( 0, 8 ):
+            for j in range( 0, 8 ):
+                yield [ i, j ]
+
+    def GenerateValidMoveList( self, source_loc ):
+        valid_move_list = []
+        for target_loc in self.EveryTileLocation():
+            move = { 'source' : source_loc, 'target' : target_loc }
+            try:
+                self.ValidMove( move )
+                valid_move_list.append( move )
+            except:
+                pass
+        return valid_move_list
 
 class ChessApp( object ):
     def __init__( self, root_dir ):
@@ -201,26 +217,30 @@ class ChessApp( object ):
             return { 'whose_turn' : game_doc[ 'game_data' ][ 'whose_turn' ] }
         return {}
 
+    def GetGameFromPayload( self ):
+        content_length = cherrypy.request.headers[ 'Content-Length' ]
+        payload = cherrypy.request.body.read( int( content_length ) )
+        payload = payload.decode( 'utf-8' )
+        payload = json.loads( payload )
+        game_name = payload[ 'game_name' ]
+        game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+        if not game_doc:
+            raise Exception( 'A game by the name "%s" could not be found.' % game_name )
+        game = ChessGame()
+        game.Deserialize( game_doc['game_data'] )
+        return game, payload
+
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def make_move( self, **kwargs ):
         try:
-            content_length = cherrypy.request.headers[ 'Content-Length' ]
-            payload = cherrypy.request.body.read( int( content_length ) )
-            payload = payload.decode( 'utf-8' )
-            payload = json.loads( payload )
-            game_name = payload[ 'game_name' ]
-            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
-            if not game_doc:
-                return { 'error': 'A game by the name "%s" could not be found.' % game_name }
-            game = ChessGame()
-            game.Deserialize( game_doc[ 'game_data'] )
+            game, payload = self.GetGameFromPayload()
             if game.whose_turn != payload[ 'playing_as' ] and payload[ 'playing_as' ] != 2: # 2 -> Playing as both black and white.
                 raise Exception( 'It is not yet your turn.' )
             move = payload[ 'move' ]
             game.MakeMove( move )
             game_data = game.Serialize()
-            result = self.game_collection.update_one( { 'game_name': game_name }, { '$set' : { 'game_data' : game_data } } )
+            result = self.game_collection.update_one( { 'game_name': payload[ 'game_name' ] }, { '$set' : { 'game_data' : game_data } } )
             result = None
         except Exception as ex:
             return { 'error' : str(ex) }
@@ -229,7 +249,12 @@ class ChessApp( object ):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def all_valid_moves( self, **kwargs ):
-        pass # TODO: Return all valid moves for the given piece.
+        try:
+            game, payload = self.GetGameFromPayload()
+            valid_move_list = game.GenerateValidMoveList( payload[ 'location' ] )
+            return { 'valid_move_list': valid_move_list }
+        except Exception as ex:
+            return { 'error': str(ex) }
 
 if __name__ == '__main__':
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
