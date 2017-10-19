@@ -17,6 +17,14 @@ select {
 	height: 800px;
 }
 
+.tile_move_good {
+    border: 5px solid green;
+}
+
+.tile_move_bad {
+    border: 5px solid red;
+}
+
 .tile {
 	z-index: 0;
 }

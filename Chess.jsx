@@ -112,26 +112,46 @@ class ChessBoardTile extends React.Component {
         super( props );
     }
 
+    GetLocationFromId( id ) {
+        var loc = /([0-9])_([0-9])/g.exec( id );
+        return [ parseInt( loc[1] ), parseInt( loc[2] ) ];
+    }
+
     OnDragStart( evt ) {
-        // TODO: Here we might AJAX for all possible moves of peice and then cache that info away for mouse-over effects.
-        evt.dataTransfer.setData( 'source_id', evt.target.parentElement.id );
+        if( evt.target.tagName === 'IMG' ) {
+            evt.dataTransfer.setData( 'source_id', evt.target.parentElement.id );
+        } else {
+            // Don't allow drag somehow?
+        }
     }
 
     OnDragOver( evt ) {
-        evt.preventDefault(); // Say we allow dropping here?
+        evt.preventDefault(); // Say we allow dropping anywhere?
     }
 
     OnDrop( evt ) {
         evt.preventDefault();
-        var source_id = evt.dataTransfer.getData( 'source_id' );
-        var source_loc = /([0-9])_([0-9])/g.exec( source_id );
-        var target_id = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement.id : evt.target.id;
-        var target_loc = /([0-9])_([0-9])/g.exec( target_id );
         var move = {
-            source: [ parseInt( source_loc[1] ), parseInt( source_loc[2] ) ],
-            target: [ parseInt( target_loc[1] ), parseInt( target_loc[2] ) ]
+            source: this.GetLocationFromId( evt.dataTransfer.getData( 'source_id' ) ),
+            target: this.GetLocationFromId( ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement.id : evt.target.id )
         }
         MakeMove( move );
+    }
+
+    OnDragEnter( evt ) {
+        /*var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
+        if( !tile_div.classList.contains( 'tile_move_good' ) ) {
+            tile_div.classList.add( 'tile_move_good' );
+            console.log( 'added: ' + tile_div.id );
+        }*/
+    }
+
+    OnDragLeave( evt ) {
+        /*var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
+        if( tile_div.classList.contains( 'tile_move_good' ) ) {
+            tile_div.classList.remove( 'tile_move_good' );
+            console.log( 'removed: ' + tile_div.id );
+        }*/
     }
 
     render() {
@@ -156,7 +176,16 @@ class ChessBoardTile extends React.Component {
             var occupant_div = <img draggable={true} onDragStart={this.OnDragStart.bind(this)} className="occupant" src={'images/' + occupant_image + '.png'} width={100} height={100}></img>;
             tile_occupants.push( occupant_div );
         }
-        return React.createElement( 'div', { id: id, style: style, className: tileClass, onDrop: this.OnDrop.bind(this), onDragOver: this.OnDragOver.bind(this), ref: 'tile' }, ...tile_occupants );
+        return React.createElement( 'div', {
+            id: id,
+            style: style,
+            className: tileClass,
+            onDrop: this.OnDrop.bind(this),
+            onDragOver: this.OnDragOver.bind(this),
+            onDragEnter: this.OnDragEnter.bind(this),
+            onDragLeave: this.OnDragLeave.bind(this),
+            ref: 'tile'
+        }, ...tile_occupants );
     }
 
     getOccupantImage( occupant ) {

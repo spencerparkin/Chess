@@ -3,8 +3,8 @@
 import os
 import cherrypy
 import pymongo
-import time
 import json
+import copy
 
 class ChessGame( object ):
     EMPTY = 0
@@ -98,8 +98,6 @@ class ChessGame( object ):
             if row_diff == 2 * sign and col_diff == 0:
                 if move_source[0] != first_file:
                     raise Exception( 'A pawn can only move 2 tiles from the first file.' )
-                if self.matrix[ move_source[0] + sign ][ move_source[1] ] != self.EMPTY:
-                    raise Exception( 'A pawn can only move 2 tiles from the first file if the tile skipped is unoccupied.' )
             elif row_diff == 1 * sign and col_diff == 0:
                 pass
             elif row_diff == 1 * sign and abs( col_diff ) == 1:
@@ -107,8 +105,20 @@ class ChessGame( object ):
                     raise Exception( 'A pawn can only move diagonally if it is going to attack.' )
             else:
                 raise Exception( 'Pawns can only move orthogonally one tile if advancing, or diagonally one tile if attacking.  In any case, pawns must always move toward the enemy\'s side.' )
+        if source_occupant != self.WHITE_KNIGHT and source_occupant != self.BLACK_KNIGHT:
+            move_intermediate = copy.copy( move_source )
+            row_delta = 1 if row_diff > 0 else ( -1 if row_diff < 0 else 0 )
+            col_delta = 1 if col_diff > 0 else ( -1 if col_diff < 0 else 0 )
+            move_intermediate[0] += row_delta
+            move_intermediate[1] += col_delta
+            while move_intermediate != move_target:
+                if self.matrix[ move_intermediate[0] ][ move_intermediate[1] ] != self.EMPTY:
+                    raise Exception( 'No piece, except for knights, can jump over other pieces.' )
+                move_intermediate[0] += row_delta
+                move_intermediate[1] += col_delta
 
     def MakeMove( self, move ):
+        # TODO: How do we implement the castling move?
         self.ValidMove( move )
         move_source = move[ 'source' ]
         move_target = move[ 'target' ]
