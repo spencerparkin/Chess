@@ -183,6 +183,15 @@ class ChessApp( object ):
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def whose_turn( self, **kwargs ):
+        game_name = kwargs[ 'game_name' ]
+        game_doc = self.game_collection.find_one( { 'game_name' : game_name } )
+        if game_doc:
+            return { 'whose_turn' : game_doc[ 'game_data' ][ 'whose_turn' ] }
+        return {}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def make_move( self, **kwargs ):
         try:
             content_length = cherrypy.request.headers[ 'Content-Length' ]

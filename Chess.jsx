@@ -1,5 +1,11 @@
 // Chess.jsx
 
+var GetGameName = function() {
+    var game_dropdown = document.getElementById( 'game' );
+    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    return game_name;
+}
+
 var RepopulateGameDropdown = function() {
     $.getJSON( 'game_list', {}, function( json_data ) {
         if( json_data.error ) {
@@ -27,8 +33,7 @@ var OnNewButtonClicked = function() {
 }
 
 var OnDeleteButtonClicked = function() {
-    var game_dropdown = document.getElementById( 'game' );
-    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    var game_name = GetGameName();
     if( confirm( 'Delete game by the name "' + game_name + '"?' ) ) {
         $.getJSON( 'delete_game', { 'game_name' : game_name }, function( json_data ) {
             if( json_data.error ) {
@@ -41,8 +46,7 @@ var OnDeleteButtonClicked = function() {
 }
 
 var RefreshGame = function() {
-    var game_dropdown = document.getElementById( 'game' );
-    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    var game_name = GetGameName();
     $.getJSON( 'game_state', { 'game_name' : game_name }, function( json_data ) {
         if( json_data.error ) {
             alert( json_data.error );
@@ -56,11 +60,8 @@ var OnRefreshButtonClicked = function() {
     RefreshGame();
 }
 
-// TODO: Use web-socket to know when to refresh when opponent takes turn?
-
 var MakeMove = function( move ) {
-    var game_dropdown = document.getElementById( 'game' );
-    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    var game_name = GetGameName();
     $.ajax( {
         url: 'make_move',
         data: JSON.stringify( { 'game_name' : game_name, 'move' : move, 'playing_as' : chess_board.state.playing_as } ),
@@ -238,3 +239,16 @@ class ChessBoard extends React.Component {
 
 var chess_board = ReactDOM.render( <ChessBoard/>, document.getElementById( 'chess_board' ) );
 var game_dropdown = ReactDOM.render( <GameDropdown/>, document.getElementById( 'game_dropdown_span' ) );
+
+setInterval( function() {
+    if( chess_board.state.whose_turn === 0 /* white */ || chess_board.state.whose_turn === 1 /* black */ ) {
+        if( chess_board.state.playing_as !== 2 /* both */ && chess_board.state.playing_as != chess_board.state.whose_turn ) {
+            var game_name = GetGameName();
+            $.getJSON( 'whose_turn', { 'game_name' : game_name }, function( json_data ) {
+                if( json_data.whose_turn !== undefined && json_data.whose_turn === chess_board.state.playing_as ) {
+                    RefreshGame();
+                }
+            } );
+        }
+    }
+}, 1000 );
