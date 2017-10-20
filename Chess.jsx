@@ -110,15 +110,28 @@ class GameDropdown extends React.Component {
 var highlighted_tile_id = undefined; // Ick!  A global!
 var valid_move_list = undefined; // Ugh...and another.
 
+var GetLocationFromId = function( id ) {
+    var loc = /([0-9])_([0-9])/g.exec( id );
+    if( loc === null ) {
+        return null;
+    }
+    return [ parseInt( loc[1] ), parseInt( loc[2] ) ];
+}
+
+var IsLocationInList = function( given_loc, location_list ) {
+    for( var i = 0; i < location_list.length; i++ ) {
+        var loc = location_list[i];
+        if( loc[0] === given_loc[0] && loc[1] === given_loc[1] ) {
+            return true;
+        }
+    }
+    return false;
+}
+
 class ChessBoardTile extends React.Component {
     constructor( props ) {
         super( props );
         this.highlighted_tile_id = undefined;
-    }
-
-    GetLocationFromId( id ) {
-        var loc = /([0-9])_([0-9])/g.exec( id );
-        return [ parseInt( loc[1] ), parseInt( loc[2] ) ];
     }
 
     OnDragStart( evt ) {
@@ -126,16 +139,14 @@ class ChessBoardTile extends React.Component {
             valid_move_list = undefined;
             var source_id = evt.target.parentElement.id;
             evt.dataTransfer.setData( 'source_id', source_id );
-            var source_loc = this.GetLocationFromId( source_id );
+            var source_loc = GetLocationFromId( source_id );
             $.ajax( {
                 url: 'all_valid_moves',
                 data: JSON.stringify( { game_name: GetGameName(), location: source_loc } ),
                 contentType: 'application/json',
                 type: 'POST',
                 success: function( json_data ) {
-                    valid_move_list = json_data.valid_move_list.map( function( move ) {
-                        return move.target;
-                    } );
+                    valid_move_list = json_data.valid_move_list.map( move => move.target );
                 }
             } );
         } else {
@@ -150,8 +161,8 @@ class ChessBoardTile extends React.Component {
     OnDrop( evt ) {
         evt.preventDefault();
         var move = {
-            source: this.GetLocationFromId( evt.dataTransfer.getData( 'source_id' ) ),
-            target: this.GetLocationFromId( ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement.id : evt.target.id )
+            source: GetLocationFromId( evt.dataTransfer.getData( 'source_id' ) ),
+            target: GetLocationFromId( ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement.id : evt.target.id )
         }
         MakeMove( move );
     }
@@ -169,23 +180,13 @@ class ChessBoardTile extends React.Component {
         }
     }
 
-    IsValidMove( move ) {
-        for( var i = 0; i < valid_move_list.length; i++ ) {
-            var valid_move = valid_move_list[i];
-            if( valid_move[0] === move[0] && valid_move[1] === move[1] ) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     OnDragEnter( evt ) {
         this.ClearHighlightedTile();
         var tile_div = ( evt.target.tagName === 'IMG' ) ? evt.target.parentElement : evt.target;
         var target_id = tile_div.id;
-        var target_loc = this.GetLocationFromId( target_id );
+        var target_loc = GetLocationFromId( target_id );
         if( valid_move_list !== undefined ) {
-            if( this.IsValidMove( target_loc ) ) {
+            if( IsLocationInList( target_loc, valid_move_list ) ) {
                 tile_div.classList.add( 'tile_move_good' );
             } else {
                 tile_div.classList.add( 'tile_move_bad' );
@@ -321,3 +322,46 @@ setInterval( function() {
         }
     }
 }, 1000 );
+
+var mouseover_tile_observable_array = [];
+for( var i = 0; i < 8; i++ ) {
+    for( var j = 0; j < 8; j++ ) {
+        var id = i.toString() + '_' + j.toString();
+        var tile = $( '#' + id );
+        var observable$ = Rx.Observable.fromEvent( tile, 'mouseover' );
+        mouseover_tile_observable_array.push( observable$ );
+    }
+}
+
+Rx.Observable.merge( ...mouseover_tile_observable_array )
+    .filter( evt => {
+        var loc = GetLocationFromId( evt.currentTarget.id );
+        return ( loc !== null ) ? true : false;
+    } ).map( evt => {
+        var loc = GetLocationFromId( evt.currentTarget.id );
+        return loc;
+    } ).switchMap( loc => {
+        return Rx.Observable.fromPromise( $.ajax( {
+            url: 'all_kill_moves',
+            data: JSON.stringify( { game_name: GetGameName(), location: loc } ),
+            contentType: 'application/json',
+            type: 'POST'
+        } ).promise() );
+    } ).map( json_data => {
+        return json_data.kill_move_list.map( move => move.target );
+    } ).subscribe( target_list => {
+        for( var i = 0; i < 8; i++ ) {
+            for( var j = 0; j < 8; j++ ) {
+                var id = i.toString() + '_' + j.toString();
+                var tile = $( '#' + id );
+                if( IsLocationInList( [ i, j ], target_list ) ) {
+                    tile.addClass( 'tile_piece_checked' );
+                } else {
+                    tile.removeClass( 'tile_piece_checked' );
+                }
+            }
+        }
+    },
+    error => {
+        console.log( error );
+    } );

@@ -93,7 +93,7 @@ class ChessGame( object ):
         elif source_occupant == self.WHITE_PAWN or source_occupant == self.BLACK_PAWN:
             sign = -1 if source_occupant == self.WHITE_PAWN else 1
             first_file = 6 if source_occupant == self.WHITE_PAWN else 1
-            if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color is not None and target_color != self.EMPTY:
+            if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color is not None:
                 raise Exception( 'Pawns can only attack on diagonals.' )
             if row_diff == 2 * sign and col_diff == 0:
                 if move_source[0] != first_file:
@@ -146,6 +146,11 @@ class ChessGame( object ):
             except:
                 pass
         return valid_move_list
+
+    def GenerateKillMoveList( self, source_loc ):
+        valid_move_list = self.GenerateValidMoveList( source_loc )
+        kill_move_list = [ move for move in valid_move_list if self.matrix[ move[ 'target' ][0] ][ move[ 'target' ][1] ] != self.EMPTY ]
+        return kill_move_list
 
 class ChessApp( object ):
     def __init__( self, root_dir ):
@@ -253,6 +258,16 @@ class ChessApp( object ):
             game, payload = self.GetGameFromPayload()
             valid_move_list = game.GenerateValidMoveList( payload[ 'location' ] )
             return { 'valid_move_list': valid_move_list }
+        except Exception as ex:
+            return { 'error': str(ex) }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def all_kill_moves( self, **kwargs ):
+        try:
+            game, payload = self.GetGameFromPayload()
+            kill_move_list = game.GenerateKillMoveList( payload[ 'location' ] )
+            return { 'kill_move_list': kill_move_list }
         except Exception as ex:
             return { 'error': str(ex) }
 

@@ -25,6 +25,10 @@ select {
     border: 5px solid red;
 }
 
+.tile_piece_checked {
+    border: 5px solid purple;
+}
+
 .tile {
 	z-index: 0;
 }
