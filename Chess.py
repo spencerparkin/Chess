@@ -32,23 +32,24 @@ class ChessGame( object ):
             [ self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY ],
             [ self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY, self.EMPTY ],
             [ self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN, self.WHITE_PAWN ],
-            [ self.WHITE_ROOK, self.WHITE_KNIGHT, self.WHITE_BISHOP, self.WHITE_KING, self.WHITE_QUEEN, self.WHITE_BISHOP, self.WHITE_KNIGHT, self.WHITE_ROOK ]
+            [ self.WHITE_ROOK, self.WHITE_KNIGHT, self.WHITE_BISHOP, self.WHITE_QUEEN, self.WHITE_KING, self.WHITE_BISHOP, self.WHITE_KNIGHT, self.WHITE_ROOK ]
         ]
         self.whose_turn = self.WHITE_PLAYER;
         self.move_count = 0
-        # TODO: We might keep a history of all the moves that were made, and then allow for undo/redo.
-        #       Even if we don't do undo/redo, it would be very nice to see a history of moves made as a side-bar.
+        self.move_history = [] # TODO: How history in page.  Offer undo/redo?  That shouldn't be hard.
 
     def Serialize( self ):
         data = {
             'matrix' : self.matrix,
-            'whose_turn' : self.whose_turn
+            'whose_turn' : self.whose_turn,
+            'move_history' : self.move_history
         }
         return data
 
     def Deserialize( self, data ):
         self.matrix = data[ 'matrix' ]
         self.whose_turn = data[ 'whose_turn' ]
+        self.move_history = data[ 'move_history' ]
 
     def ColorOfOccupant( self, occupant ):
         if occupant >= 1 and occupant <= 6:
@@ -57,7 +58,9 @@ class ChessGame( object ):
             return self.BLACK_PLAYER
         return None
 
-    def ValidMove( self, move ):
+    def ValidMove( self, move, whose_turn = None ):
+        if whose_turn is None:
+            whose_turn = self.whose_turn
         move_source = move[ 'source' ]
         move_target = move[ 'target' ]
         # Notice that here we're also making sure that the coordinates are in bound by trying to use them on the matrix.
@@ -68,15 +71,21 @@ class ChessGame( object ):
         if source_occupant == self.EMPTY:
             raise Exception( 'No piece to move.' )
         source_color = self.ColorOfOccupant( source_occupant )
-        if source_color != self.whose_turn:
+        if source_color != whose_turn:
             raise Exception( 'Piece cannot be moved on this turn.' )
         target_color = self.ColorOfOccupant( target_occupant )
-        if target_color is not None and target_color == self.whose_turn:
-            raise Exception( 'Piece cannot capture one of its own kind.' )
+        castling = False
+        if target_color is not None and target_color == source_color:
+            if source_occupant == self.WHITE_KING and target_occupant == self.WHITE_ROOK:
+                castling = True
+            elif source_occupant == self.BLACK_KING and target_occupant == self.BLACK_ROOK:
+                castling = True
+            else:
+                raise Exception( 'Piece cannot capture one of its own kind.' )
         row_diff = move_target[0] - move_source[0]
         col_diff = move_target[1] - move_source[1]
         if source_occupant == self.WHITE_KING or source_occupant == self.BLACK_KING:
-            if abs( row_diff ) > 1 or abs( col_diff ) > 1:
+            if abs( row_diff ) > 1 or abs( col_diff ) > 1 and not castling:
                 raise Exception( 'The king cannot move that far.' )
         elif source_occupant == self.WHITE_QUEEN or source_occupant == self.BLACK_QUEEN:
             if abs( row_diff ) != 0 and abs( col_diff ) != 0 and abs( row_diff ) != abs( col_diff ):
@@ -116,20 +125,54 @@ class ChessGame( object ):
                     raise Exception( 'No piece, except for knights, can jump over other pieces.' )
                 move_intermediate[0] += row_delta
                 move_intermediate[1] += col_delta
+        if castling:
+            if source_occupant == self.WHITE_KING and target_occupant == self.WHITE_ROOK:
+                for prev_move in self.move_history:
+                    if prev_move[ 'move' ][ 'source' ][0] == 7 and prev_move[ 'move' ][ 'source' ][1] == 4:
+                        raise Exception( 'A king can only castle if it has never before moved.' )
+                    # TODO: The rook involved must not have previously moved.
+                # TODO: The king cannot be in check, nor can castling put it in check.
+            elif source_occupant == self.BLACK_KING and target_occupant == self.BLACK_ROOK:
+                for prev_move in self.move_history:
+                    if prev_move[ 'move' ][ 'source' ][0] == 0 and prev_move[ 'move' ][ 'source' ][1] == 4:
+                        raise Exception( 'A king can only castle if it has never before moved.' )
+                    # TODO: The rook involved must not have previously moved.
+                # TODO: The king cannot be in check, nor can castling put it in check.
+        return castling
 
     def MakeMove( self, move ):
-        # TODO: How do we implement the castling move?
-        self.ValidMove( move )
+        castling = self.ValidMove( move )
         move_source = move[ 'source' ]
         move_target = move[ 'target' ]
-        occupant = self.matrix[ move_source[0] ][ move_source[1] ]
-        if occupant == self.WHITE_PAWN and move_target[0] == 0:
-            occupant = self.WHITE_QUEEN # TODO: They should actually get to choose between this and other pieces.
-        elif occupant == self.BLACK_PAWN and move_target[0] == 7:
-            occupant = self.BLACK_QUEEN # TODO: Again, they should actually get to choose here.
-        self.matrix[ move_target[0] ][ move_target[1] ] = occupant
-        self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY;
+        capture = self.EMPTY
+        if not castling:
+            occupant = self.matrix[ move_source[0] ][ move_source[1] ]
+            if occupant == self.WHITE_PAWN and move_target[0] == 0:
+                occupant = self.WHITE_QUEEN # TODO: They should actually get to choose between this and other pieces.
+            elif occupant == self.BLACK_PAWN and move_target[0] == 7:
+                occupant = self.BLACK_QUEEN # TODO: Again, they should actually get to choose here.
+            capture = self.matrix[ move_target[0] ][ move_target[1] ]
+            self.matrix[ move_target[0] ][ move_target[1] ] = occupant
+            self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY
+        else:
+            self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY
+            self.matrix[ move_target[0] ][ move_target[1] ] = self.EMPTY
+            if move_source[0] == 7:
+                if move_target[1] == 7: # White king castles right side.
+                    self.matrix[7][6] = self.WHITE_KING
+                    self.matrix[7][5] = self.WHITE_ROOK
+                elif move_target[1] == 0: # White king castles left side.
+                    self.matrix[7][2] = self.WHITE_KING
+                    self.matrix[7][3] = self.WHITE_ROOK
+            elif move_source[0] == 0:
+                if move_target[1] == 7: # Black king castles right side.
+                    self.matrix[0][6] = self.WHITE_KING
+                    self.matrix[0][5] = self.WHITE_ROOK
+                elif move_target[1] == 0: # Black king castles left side.
+                    self.matrix[0][2] = self.WHITE_KING
+                    self.matrix[0][3] = self.WHITE_ROOK
         self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
+        self.move_history.append( { 'move' : move, 'capture' : capture } )
 
     def EveryTileLocation( self ):
         for i in range( 0, 8 ):
@@ -151,6 +194,17 @@ class ChessGame( object ):
         valid_move_list = self.GenerateValidMoveList( source_loc )
         kill_move_list = [ move for move in valid_move_list if self.matrix[ move[ 'target' ][0] ][ move[ 'target' ][1] ] != self.EMPTY ]
         return kill_move_list
+
+    def ThreatListToLocation( self, target_loc, whose_turn ):
+        threat_list = []
+        for source_loc in self.EveryTileLocation():
+            move = { 'source' : source_loc, 'target' : target_loc }
+            try:
+                self.ValidMove( move, whose_turn )
+                threat_list.append( source_loc )
+            except:
+                pass
+        return threat_list
 
 class ChessApp( object ):
     def __init__( self, root_dir ):
