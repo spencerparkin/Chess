@@ -167,11 +167,11 @@ class ChessGame( object ):
                     self.matrix[7][3] = self.WHITE_ROOK
             elif move_source[0] == 0:
                 if move_target[1] == 7: # Black king castles right side.
-                    self.matrix[0][6] = self.WHITE_KING
-                    self.matrix[0][5] = self.WHITE_ROOK
+                    self.matrix[0][6] = self.BLACK_KING
+                    self.matrix[0][5] = self.BLACK_ROOK
                 elif move_target[1] == 0: # Black king castles left side.
-                    self.matrix[0][2] = self.WHITE_KING
-                    self.matrix[0][3] = self.WHITE_ROOK
+                    self.matrix[0][2] = self.BLACK_KING
+                    self.matrix[0][3] = self.BLACK_ROOK
         self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
         self.move_history.append( { 'move' : move, 'capture' : capture } )
 

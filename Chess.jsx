@@ -379,4 +379,6 @@ Rx.Observable.merge( ...mouseover_tile_observable_array )
     },
     error => {
         console.log( error );
+    } ).catch( error => {
+        return [];
     } );
