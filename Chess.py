@@ -5,6 +5,7 @@ import cherrypy
 import pymongo
 import json
 import copy
+import random
 
 class ChessGame( object ):
     EMPTY = 0
@@ -206,6 +207,24 @@ class ChessGame( object ):
                 pass
         return threat_list
 
+    def Metric( self ):
+        # This metric is by Claude E. Shannon.
+        # How good the position is for white is how positive a metric we get.
+        # How good the position is for black is how negative a matrix we get.
+        counts = [ 0 for i in range( 13 ) ]
+        for location in self.EveryTileLocation():
+            occupant = self.matrix[ location[0] ][ location[1] ]
+            counts[ occupant ] += 1
+        sum = 0.0
+        sum += 200.0 * float( counts[ self.WHITE_KING ] - counts[ self.BLACK_KING ] )
+        sum += 9.0 * float( counts[ self.WHITE_QUEEN ] - counts[ self.BLACK_QUEEN ] )
+        sum += 3.0 * float( counts[ self.WHITE_BISHOP ] - counts[ self.BLACK_BISHOP ] )
+        sum += 3.0 * float( counts[ self.WHITE_KNIGHT ] - counts[ self.BLACK_KNIGHT ] )
+        sum += float( counts[ self.WHITE_PAWN ] - counts[ self.BLACK_PAWN ] )
+        # TODO: sum -= 0.5 * ( D-D' + S-S' + I-I' ) # doubled, blocked & isolated pawns
+        # TODO: sum += 0.1 * ( M-M' ) + ... # mobility (the number of legal moves per piece?)
+        return sum
+
 class ChessApp( object ):
     def __init__( self, root_dir ):
         self.root_dir = root_dir
@@ -307,6 +326,24 @@ class ChessApp( object ):
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
+    def make_computer_move( self, **kwargs ):
+        try:
+            game_name = kwargs[ 'game_name' ]
+            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+            game = ChessGame()
+            game.Deserialize( game_doc[ 'game_data' ] )
+            computer_player = ComputerPlayer()
+            move = computer_player.DetermineReasonableMove( game )
+            game.MakeMove( move )
+            game_data = game.Serialize()
+            result = self.game_collection.update_one( { 'game_name' : game_name }, { '$set' : { 'game_data' : game_data } } )
+            result = None
+        except Exception as ex:
+            return { 'error' : str(ex) }
+        return {}
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
     def all_valid_moves( self, **kwargs ):
         try:
             game, payload = self.GetGameFromPayload()
@@ -325,7 +362,61 @@ class ChessApp( object ):
         except Exception as ex:
             return { 'error': str(ex) }
 
+class ComputerPlayer( object ):
+    def __init__( self ):
+        pass
+
+    # TODO: Optimize this with alpha-beta pruning.
+    # Here we implement the mini-max algorithm.
+    def DetermineReasonableMove( self, game, max_depth = 3 ):
+        try:
+            move = self.DetermineReasonableMoveRecursively( game, max_depth )
+        except Exception as ex:
+            raise ex
+        return move
+
+    def DetermineReasonableMoveRecursively( self, game, max_depth = 3, depth = 1 ):
+        if depth == max_depth:
+            return game.Metric()
+        else:
+            valid_move_list = []
+            for source_loc in game.EveryTileLocation():
+                valid_move_list += game.GenerateValidMoveList( source_loc )
+            metric_list = []
+            for move in valid_move_list:
+                game_copy = copy.deepcopy( game )
+                game_copy.MakeMove( move )
+                metric = self.DetermineReasonableMoveRecursively( game_copy, max_depth, depth + 1 )
+                metric_list.append( metric )
+            max = -999999.0
+            min = 999999.0
+            for i in range( len( metric_list ) ):
+                metric = metric_list[i]
+                if metric > max:
+                    max = metric
+                if metric < min:
+                    min = metric
+            metric = None
+            if game.whose_turn == ChessGame.WHITE_PLAYER:
+                metric = max
+            elif game.whose_turn == ChessGame.BLACK_PLAYER:
+                metric = min
+            i = self.ChooseRandom( metric_list, metric )
+            if depth > 1:
+                return metric_list[i]
+            return valid_move_list[i]
+
+    def ChooseRandom( self, metric_list, metric ):
+        index_list = []
+        for i in range( len( metric_list ) ):
+            if metric_list[i] == metric:
+                index_list.append(i)
+        j = random.randint( 0, len( index_list ) - 1 )
+        return index_list[j]
+
 if __name__ == '__main__':
+    # TODO: Seed random number generator.
+
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
     port = int( os.environ.get( 'PORT', 5100 ) )
 

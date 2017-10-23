@@ -72,6 +72,15 @@ var MakeMove = function( move ) {
                 alert( json_data.error );
             } else {
                 RefreshGame();
+                if( document.getElementById( 'computer_respond_checkbox' ).checked ) {
+                    $.getJSON( 'make_computer_move', { 'game_name' : game_name }, function() {
+                        if( json_data.error ) {
+                            alert( json_data.error );
+                        } else {
+                            RefreshGame();
+                        }
+                    } );
+                }
             }
         }
     } );
@@ -303,7 +312,8 @@ class ChessBoard extends React.Component {
         }
         style = { width: '800px' };
         var whose_turn_div = <center><p style={style}>{whose_turn}</p></center>;
-        return React.createElement( 'div', null, whose_turn_div, chess_board_div );
+        var computer_checkbox = <center style={style}><input id="computer_respond_checkbox" type="checkbox"></input><label htmlFor="computer_respond_checkbox">Have computer respond.</label></center>;
+        return React.createElement( 'div', null, whose_turn_div, chess_board_div, computer_checkbox );
     }
 }
 
