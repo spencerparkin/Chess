@@ -368,8 +368,16 @@ class ComputerPlayer( object ):
 
     # TODO: Optimize this with alpha-beta pruning.
     # Here we implement the mini-max algorithm.
-    def DetermineReasonableMove( self, game, max_depth = 3 ):
+    def DetermineReasonableMove( self, game ):
         try:
+            max_depth = 3
+            count = 0
+            for loc in game.EveryTileLocation():
+                if game.matrix[ loc[0] ][ loc[1] ] != ChessGame.EMPTY:
+                    count += 1
+            if count <= 6:
+                # This helps us recognize some check-mate situations that we wouldn't otherwise recognize.
+                max_depth = 4
             move = self.DetermineReasonableMoveRecursively( game, max_depth )
         except Exception as ex:
             raise ex
