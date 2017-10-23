@@ -73,12 +73,14 @@ var MakeMove = function( move ) {
             } else {
                 RefreshGame();
                 if( document.getElementById( 'computer_respond_checkbox' ).checked ) {
+                    $( '#ajax_wait' ).show();
                     $.getJSON( 'make_computer_move', { 'game_name' : game_name }, function() {
                         if( json_data.error ) {
                             alert( json_data.error );
                         } else {
                             RefreshGame();
                         }
+                        $( '#ajax_wait' ).hide();
                     } );
                 }
             }
@@ -322,7 +324,7 @@ var game_dropdown = ReactDOM.render( <GameDropdown/>, document.getElementById( '
 
 setInterval( function() {
     if( chess_board.state.whose_turn === 0 /* white */ || chess_board.state.whose_turn === 1 /* black */ ) {
-        if( chess_board.state.playing_as !== 2 /* both */ && chess_board.state.playing_as != chess_board.state.whose_turn ) {
+        if( chess_board.state.playing_as !== 2 /* both */ && chess_board.state.playing_as !== chess_board.state.whose_turn ) {
             var game_name = GetGameName();
             $.getJSON( 'whose_turn', { 'game_name' : game_name }, function( json_data ) {
                 if( json_data.whose_turn !== undefined && json_data.whose_turn === chess_board.state.playing_as ) {
@@ -338,11 +340,14 @@ for( var i = 0; i < 8; i++ ) {
     for( var j = 0; j < 8; j++ ) {
         var id = i.toString() + '_' + j.toString();
         var tile = $( '#' + id );
+        // It might be bad practice to do this on React-generated elements.
+        // I may be able to get away with it, though, because the elements don't go stale.
         var observable$ = Rx.Observable.fromEvent( tile, 'mouseover' );
         mouseover_tile_observable_array.push( observable$ );
     }
 }
 
+// TODO: Use a catch here to be more resiliant?
 Rx.Observable.merge( ...mouseover_tile_observable_array )
     .filter( evt => {
         var loc = GetLocationFromId( evt.currentTarget.id );
