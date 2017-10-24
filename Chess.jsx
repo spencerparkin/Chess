@@ -142,7 +142,6 @@ var IsLocationInList = function( given_loc, location_list ) {
 class ChessBoardTile extends React.Component {
     constructor( props ) {
         super( props );
-        this.highlighted_tile_id = undefined;
     }
 
     OnDragStart( evt ) {
@@ -260,6 +259,41 @@ class ChessBoardTile extends React.Component {
     }
 }
 
+var MoveToNotation = function( move ) {
+    let file_array = [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' ];
+    let rank = 8 - move.move.target[0];
+    let file = file_array[ move.move.target[1] ];
+    let piece_letter_array = [ 'P', 'R', 'B', 'Q', 'K' ];
+    let i = move.actor < 7 ? move.actor - 1 : move.actor - 7;
+    let piece_letter = piece_letter_array[i];
+    let notation = piece_letter;
+    if( move.capture ) {
+        notation += ':';
+    }
+    notation += rank + file;
+    return notation;
+    // TODO: Castling?  O-O or O-O-O
+}
+
+class ChessBoardHistoryBox extends React.Component {
+    constructor( props ) {
+        super( props );
+    }
+
+    // TODO: Add onClick handler to reset board state to moment before clicked move was made.
+    //       This would be a simple ajax request.  A subsequent move blows away history that
+    //       comes after the reset point.
+
+    render() {
+        let move_history = this.props.move_history;
+        let item_anchor_array = [];
+        move_history.map( move => {
+            item_anchor_array.push( <a className="history_box_item">{MoveToNotation(move)}</a> );
+        } );
+        return React.createElement( 'div', { id: "history_box" }, ...item_anchor_array );
+    }
+}
+
 class ChessBoard extends React.Component {
     constructor( props ) {
         super( props );
@@ -275,7 +309,8 @@ class ChessBoard extends React.Component {
                 [ 0, 0, 0, 0, 0, 0, 0, 0 ]
             ],
             whose_turn: undefined,
-            playing_as: 0
+            playing_as: 0,
+            move_history: []
         }
     }
 
@@ -313,9 +348,11 @@ class ChessBoard extends React.Component {
             whose_turn = "It is no one's turn yet.";
         }
         style = { width: '800px' };
-        var whose_turn_div = <center><p style={style}>{whose_turn}</p></center>;
-        var computer_checkbox = <center style={style}><input id="computer_respond_checkbox" type="checkbox"></input><label htmlFor="computer_respond_checkbox">Have computer respond.</label></center>;
-        return React.createElement( 'div', null, whose_turn_div, chess_board_div, computer_checkbox );
+        var whose_turn_div = <p style={style}>{whose_turn}</p>;
+        var computer_checkbox = <p style={style}><input id="computer_respond_checkbox" type="checkbox"></input><label htmlFor="computer_respond_checkbox">Have computer respond.</label></p>;
+        var history_box_div = <ChessBoardHistoryBox move_history={this.state.move_history}/>;
+        var container_div = React.createElement( 'div', { style: { float: 'left', display: 'flex' } }, chess_board_div, history_box_div );
+        return React.createElement( 'div', null, whose_turn_div, container_div, computer_checkbox );
     }
 }
 
@@ -335,6 +372,7 @@ setInterval( function() {
     }
 }, 1000 );
 
+/* TODO: Fix this code.
 var mouseover_tile_observable_array = [];
 for( var i = 0; i < 8; i++ ) {
     for( var j = 0; j < 8; j++ ) {
@@ -381,4 +419,4 @@ Rx.Observable.merge( ...mouseover_tile_observable_array )
         console.log( error );
     } ).catch( error => {
         return [];
-    } );
+    } );*/

@@ -37,7 +37,7 @@ class ChessGame( object ):
         ]
         self.whose_turn = self.WHITE_PLAYER;
         self.move_count = 0
-        self.move_history = [] # TODO: How history in page.  Offer undo/redo?  That shouldn't be hard.
+        self.move_history = [] # TODO: Show history in page.  Clicking on move sets board back to state just before that move.
 
     def Serialize( self ):
         data = {
@@ -60,6 +60,7 @@ class ChessGame( object ):
         return None
 
     def ValidMove( self, move, whose_turn = None ):
+        # TODO: Ugh...En passant?!  How are we going to implement this move?
         if whose_turn is None:
             whose_turn = self.whose_turn
         move_source = move[ 'source' ]
@@ -102,12 +103,12 @@ class ChessGame( object ):
                 raise Exception( 'Knights can only move on an L-shape.' )
         elif source_occupant == self.WHITE_PAWN or source_occupant == self.BLACK_PAWN:
             sign = -1 if source_occupant == self.WHITE_PAWN else 1
-            first_file = 6 if source_occupant == self.WHITE_PAWN else 1
+            first_rank = 6 if source_occupant == self.WHITE_PAWN else 1
             if ( row_diff == 1 * sign or row_diff == 2 * sign ) and col_diff == 0 and target_color is not None:
                 raise Exception( 'Pawns can only attack on diagonals.' )
             if row_diff == 2 * sign and col_diff == 0:
-                if move_source[0] != first_file:
-                    raise Exception( 'A pawn can only move 2 tiles from the first file.' )
+                if move_source[0] != first_rank:
+                    raise Exception( 'A pawn can only move 2 tiles from the first rank.' )
             elif row_diff == 1 * sign and col_diff == 0:
                 pass
             elif row_diff == 1 * sign and abs( col_diff ) == 1:
@@ -159,6 +160,7 @@ class ChessGame( object ):
             self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY
             self.matrix[ move_target[0] ][ move_target[1] ] = self.EMPTY
             if move_source[0] == 7:
+                occupant = self.WHITE_KING
                 if move_target[1] == 7: # White king castles right side.
                     self.matrix[7][6] = self.WHITE_KING
                     self.matrix[7][5] = self.WHITE_ROOK
@@ -166,6 +168,7 @@ class ChessGame( object ):
                     self.matrix[7][2] = self.WHITE_KING
                     self.matrix[7][3] = self.WHITE_ROOK
             elif move_source[0] == 0:
+                occupant = self.BLACK_KING
                 if move_target[1] == 7: # Black king castles right side.
                     self.matrix[0][6] = self.BLACK_KING
                     self.matrix[0][5] = self.BLACK_ROOK
@@ -173,7 +176,7 @@ class ChessGame( object ):
                     self.matrix[0][2] = self.BLACK_KING
                     self.matrix[0][3] = self.BLACK_ROOK
         self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
-        self.move_history.append( { 'move' : move, 'capture' : capture } )
+        self.move_history.append( { 'move' : move, 'capture' : capture, 'actor' : occupant } )
 
     def EveryTileLocation( self ):
         for i in range( 0, 8 ):

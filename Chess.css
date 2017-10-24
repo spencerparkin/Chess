@@ -15,6 +15,28 @@ select {
 	grid-gap: 0px;
 	width: 800px;
 	height: 800px;
+	float: left;
+}
+
+#history_box {
+    flex-grow: 100; /* This doesn't work. :( */
+    height: 800px;
+    width: 300px; /* Do this for now. */
+    background-color: red;
+    border: 5px solid white;
+    overflow-y: auto;
+}
+
+.history_box_item {
+    background-color: green;
+    color: black;
+    display: block;
+    padding: 10px;
+    text-decoration: none;
+}
+
+.history_box_item:hover {
+    background-color: blue;
 }
 
 .tile_move_good {

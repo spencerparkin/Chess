@@ -12,26 +12,24 @@
 		<script type="text/babel" src="Chess.jsx"></script>
 	</head>
 	<body>
-		<center>
-			<h1>The Game of Chess</h1>
-			<p>
-				<form>
-					<input type="button" onclick="OnNewButtonClicked()" value="New"></input>
-					<input type="button" onclick="OnDeleteButtonClicked()" value="Delete"></input>
-					<label for="game_dropdown_span">Game:</label>
-					<span id="game_dropdown_span">
-					</span>
-					<label for="player_dropdown">Player:</label>
-					<select id="player_dropdown" onchange="OnPlayerDropdownChanged()">
-						<option value="0">White</option>
-						<option value="1">Black</option>
-						<option value="2">Both</option>
-					</select>
-					<img id="ajax_wait" src="images/ajax_wait.gif" style="display:none"></img>
-				</form>
-			</p>
-			<div id="chess_board">
-			</div>
-		</center>
+		<h1>The Game of Chess</h1>
+		<p>
+			<form>
+				<input type="button" onclick="OnNewButtonClicked()" value="New"></input>
+				<input type="button" onclick="OnDeleteButtonClicked()" value="Delete"></input>
+				<label for="game_dropdown_span">Game:</label>
+				<span id="game_dropdown_span">
+				</span>
+				<label for="player_dropdown">Player:</label>
+				<select id="player_dropdown" onchange="OnPlayerDropdownChanged()">
+					<option value="0">White</option>
+					<option value="1">Black</option>
+					<option value="2">Both</option>
+				</select>
+				<img id="ajax_wait" src="images/ajax_wait.gif" style="display:none"></img>
+			</form>
+		</p>
+		<div id="chess_board">
+		</div>
 	</body>
 </html>
