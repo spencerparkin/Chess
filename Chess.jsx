@@ -295,7 +295,7 @@ class ChessBoardHistoryBox extends React.Component {
 
     // TODO: How do we click to have the last item applied?  Maybe have some |< < > >| buttons?
     // TODO: Keep the list scrolled to the bottom.
-    // TODO: There are some bugs still with this.  ("Piece can't be moved on this turn." happens.)
+    // TODO: There are some bugs still with this.  ("Piece can't be moved on this turn." happens.)  Oh, I need to adjust whose turn it is when changing the board position, doh!
     OnItemClicked( evt ) {
         let id = evt.target.id;
         let loc = /history_box_item_([0-9]+)/g.exec( id );
