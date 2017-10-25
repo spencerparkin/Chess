@@ -1,8 +1,11 @@
 // Chess.jsx
 
 var GetGameName = function() {
-    var game_dropdown = document.getElementById( 'game' );
-    var game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    let game_dropdown = document.getElementById( 'game' );
+    let game_name = undefined;
+    if( game_dropdown.options.length > 0 ) {
+        game_name = game_dropdown.options[ game_dropdown.selectedIndex ].text;
+    }
     return game_name;
 }
 
@@ -13,7 +16,10 @@ var RepopulateGameDropdown = function() {
         } else {
             game_dropdown.setState( { game_list: json_data.game_list } );
             // Does setState(...) return after rendering is complete?
-            // If not, this doesn't really make sense.
+            // If not, this doesn't really make sense.  Instead of getting
+            // the game name from the rendered drop-down, we should actually
+            // be getting it from the state of the drop-down component.
+            // This removes the race condition.
             RefreshGame();
         }
     } );
@@ -165,7 +171,7 @@ class ChessBoardTile extends React.Component {
     }
 
     OnDragOver( evt ) {
-        evt.preventDefault(); // Say we allow dropping anywhere?
+        evt.preventDefault(); // I'm not sure what the default does, but we probably want to prevent it.
     }
 
     OnDrop( evt ) {
@@ -259,20 +265,27 @@ class ChessBoardTile extends React.Component {
     }
 }
 
-var MoveToNotation = function( move ) {
+var LocationToNotation = function( loc ) {
     let file_array = [ 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h' ];
-    let rank = 8 - move.move.target[0];
-    let file = file_array[ move.move.target[1] ];
-    let piece_letter_array = [ 'P', 'R', 'B', 'Q', 'K' ];
+    let rank = 8 - loc[0];
+    let file = file_array[ loc[1] ];
+    return file + rank.toString();
+}
+
+var MoveToNotation = function( move ) {
+    let piece_array = [ 'Pawn', 'Rook', 'Knight', 'Bishop', 'Queen', 'King' ];
     let i = move.actor < 7 ? move.actor - 1 : move.actor - 7;
-    let piece_letter = piece_letter_array[i];
-    let notation = piece_letter;
+    let piece_name = piece_array[i];
+    let result = piece_name + ' at ' + LocationToNotation( move.move.source );
     if( move.capture ) {
-        notation += ':';
+        i = move.capture < 7 ? move.capture - 1 : move.capture - 7;
+        piece_name = piece_array[i];
+        result += ' captures ' + piece_name + ' at ';
+    } else {
+        result += ' moves to ';
     }
-    notation += rank + file;
-    return notation;
-    // TODO: Castling?  O-O or O-O-O
+    result += LocationToNotation( move.move.target );
+    return result; // TODO: Say something different for castling?
 }
 
 class ChessBoardHistoryBox extends React.Component {
@@ -280,17 +293,41 @@ class ChessBoardHistoryBox extends React.Component {
         super( props );
     }
 
-    // TODO: Add onClick handler to reset board state to moment before clicked move was made.
-    //       This would be a simple ajax request.  A subsequent move blows away history that
-    //       comes after the reset point.
+    // TODO: How do we click to have the last item applied?  Maybe have some |< < > >| buttons?
+    // TODO: Keep the list scrolled to the bottom.
+    // TODO: There are some bugs still with this.  ("Piece can't be moved on this turn." happens.)
+    OnItemClicked( evt ) {
+        let id = evt.target.id;
+        let loc = /history_box_item_([0-9]+)/g.exec( id );
+        loc = parseInt( loc[1] );
+        $.ajax( {
+            url: 'change_board_location',
+            data: JSON.stringify( { game_name: GetGameName(), location: loc } ),
+            contentType: 'application/json',
+            type: 'POST',
+            success: function( json_data ) {
+                if( json_data.error ) {
+                    alert( json_data.error );
+                } else {
+                    RefreshGame();
+                }
+            }
+        } );
+    }
 
     render() {
         let move_history = this.props.move_history;
         let item_anchor_array = [];
+        let i = 0;
         move_history.map( move => {
-            item_anchor_array.push( <a className="history_box_item">{MoveToNotation(move)}</a> );
+            let classStr = 'history_box_item';
+            if( i === this.props.move_history_location ) {
+                classStr += ' history_box_item_highlighted';
+            }
+            item_anchor_array.push( <a id={"history_box_item_"+i.toString()} className={classStr}>{MoveToNotation(move)}</a> );
+            i++;
         } );
-        return React.createElement( 'div', { id: "history_box" }, ...item_anchor_array );
+        return React.createElement( 'div', { id: "history_box", onClick: this.OnItemClicked.bind(this) }, ...item_anchor_array );
     }
 }
 
@@ -310,7 +347,8 @@ class ChessBoard extends React.Component {
             ],
             whose_turn: undefined,
             playing_as: 0,
-            move_history: []
+            move_history: [],
+            move_history_location: 0
         }
     }
 
@@ -350,7 +388,7 @@ class ChessBoard extends React.Component {
         style = { width: '800px' };
         var whose_turn_div = <p style={style}>{whose_turn}</p>;
         var computer_checkbox = <p style={style}><input id="computer_respond_checkbox" type="checkbox"></input><label htmlFor="computer_respond_checkbox">Have computer respond.</label></p>;
-        var history_box_div = <ChessBoardHistoryBox move_history={this.state.move_history}/>;
+        var history_box_div = <ChessBoardHistoryBox move_history={this.state.move_history} move_history_location={this.state.move_history_location}/>;
         var container_div = React.createElement( 'div', { style: { float: 'left', display: 'flex' } }, chess_board_div, history_box_div );
         return React.createElement( 'div', null, whose_turn_div, container_div, computer_checkbox );
     }

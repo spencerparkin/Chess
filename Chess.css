@@ -21,7 +21,7 @@ select {
 #history_box {
     flex-grow: 100; /* This doesn't work. :( */
     height: 800px;
-    width: 300px; /* Do this for now. */
+    width: 350px; /* Do this for now. */
     background-color: red;
     border: 5px solid white;
     overflow-y: auto;
@@ -31,8 +31,13 @@ select {
     background-color: green;
     color: black;
     display: block;
-    padding: 10px;
+    padding: 5px;
     text-decoration: none;
+    cursor: pointer;
+}
+
+.history_box_item_highlighted {
+    background-color: yellow;
 }
 
 .history_box_item:hover {

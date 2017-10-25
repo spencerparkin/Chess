@@ -37,13 +37,15 @@ class ChessGame( object ):
         ]
         self.whose_turn = self.WHITE_PLAYER;
         self.move_count = 0
-        self.move_history = [] # TODO: Show history in page.  Clicking on move sets board back to state just before that move.
+        self.move_history = []
+        self.move_history_location = 0
 
     def Serialize( self ):
         data = {
             'matrix' : self.matrix,
             'whose_turn' : self.whose_turn,
-            'move_history' : self.move_history
+            'move_history' : self.move_history,
+            'move_history_location' : self.move_history_location
         }
         return data
 
@@ -51,6 +53,7 @@ class ChessGame( object ):
         self.matrix = data[ 'matrix' ]
         self.whose_turn = data[ 'whose_turn' ]
         self.move_history = data[ 'move_history' ]
+        self.move_history_location = data[ 'move_history_location' ]
 
     def ColorOfOccupant( self, occupant ):
         if occupant >= 1 and occupant <= 6:
@@ -142,8 +145,9 @@ class ChessGame( object ):
                 # TODO: The king cannot be in check, nor can castling put it in check.
         return castling
 
-    def MakeMove( self, move ):
+    def MakeMove( self, move, manage_history = True ):
         castling = self.ValidMove( move )
+        promotion = False
         move_source = move[ 'source' ]
         move_target = move[ 'target' ]
         capture = self.EMPTY
@@ -151,8 +155,10 @@ class ChessGame( object ):
             occupant = self.matrix[ move_source[0] ][ move_source[1] ]
             if occupant == self.WHITE_PAWN and move_target[0] == 0:
                 occupant = self.WHITE_QUEEN # TODO: They should actually get to choose between this and other pieces.
+                promotion = True
             elif occupant == self.BLACK_PAWN and move_target[0] == 7:
                 occupant = self.BLACK_QUEEN # TODO: Again, they should actually get to choose here.
+                promotion = True
             capture = self.matrix[ move_target[0] ][ move_target[1] ]
             self.matrix[ move_target[0] ][ move_target[1] ] = occupant
             self.matrix[ move_source[0] ][ move_source[1] ] = self.EMPTY
@@ -161,6 +167,7 @@ class ChessGame( object ):
             self.matrix[ move_target[0] ][ move_target[1] ] = self.EMPTY
             if move_source[0] == 7:
                 occupant = self.WHITE_KING
+                capture = self.WHITE_ROOK
                 if move_target[1] == 7: # White king castles right side.
                     self.matrix[7][6] = self.WHITE_KING
                     self.matrix[7][5] = self.WHITE_ROOK
@@ -169,6 +176,7 @@ class ChessGame( object ):
                     self.matrix[7][3] = self.WHITE_ROOK
             elif move_source[0] == 0:
                 occupant = self.BLACK_KING
+                capture = self.BLACK_ROOK
                 if move_target[1] == 7: # Black king castles right side.
                     self.matrix[0][6] = self.BLACK_KING
                     self.matrix[0][5] = self.BLACK_ROOK
@@ -176,7 +184,55 @@ class ChessGame( object ):
                     self.matrix[0][2] = self.BLACK_KING
                     self.matrix[0][3] = self.BLACK_ROOK
         self.whose_turn = self.WHITE_PLAYER if self.whose_turn == self.BLACK_PLAYER else self.BLACK_PLAYER
-        self.move_history.append( { 'move' : move, 'capture' : capture, 'actor' : occupant } )
+        if manage_history:
+            while self.move_history_location < len( self.move_history ):
+                del self.move_history[ self.move_history_location ]
+            self.move_history.append( { 'move' : move, 'capture' : capture, 'actor' : occupant, 'castling' : castling, 'promotion' : promotion } )
+            self.move_history_location += 1
+
+    def UnmakeMove( self, move_data ):
+        move = move_data[ 'move' ]
+        move_source = move[ 'source' ]
+        move_target = move[ 'target' ]
+        if not move_data[ 'castling' ]:
+            if not move_data[ 'promotion' ]:
+                self.matrix[ move_source[0] ][ move_source[1] ] = self.matrix[ move_target[0] ][ move_target[1] ]
+            else:
+                color = self.ColorOfOccupant( self.matrix[ move_target[0] ][ move_target[1] ] )
+                if color == self.WHITE_PLAYER:
+                    self.matrix[ move_source[0] ][ move_source[1] ] = self.WHITE_PAWN
+                elif color == self.BLACK_PLAYER:
+                    self.matrix[ move_source[0] ][ move_source[1] ] = self.BLACK_PAWN
+            if move_data[ 'capture' ]:
+                self.matrix[ move_target[0] ][ move_target[1] ] = move_data[ 'capture' ]
+            else:
+                self.matrix[ move_target[0] ][ move_target[1] ] = self.EMPTY
+        else:
+            if move_source[0] == 7:
+                if move_target[1] == 7: # White king castles right side.
+                    self.matrix[7][6] = self.EMPTY
+                    self.matrix[7][5] = self.EMPTY
+                elif move_target[1] == 7: # White king castled left side.
+                    self.matrix[7][2] = self.EMPTY
+                    self.matrix[7][3] = self.EMPTY
+            elif move_source[0] == 0:
+                if move_target[1] == 7: # Black king castled right side.
+                    self.matrix[0][6] = self.EMPTY
+                    self.matrix[0][5] = self.EMPTY
+                elif move_target[1] == 0: # Black king castled left side.
+                    self.matrix[0][2] = self.BLACK_KING
+                    self.matrix[0][3] = self.BLACK_ROOK
+            self.matrix[ move_source[0] ][ move_source[1] ] = move_data[ 'actor' ]
+            self.matrix[ move_target[0] ][ move_target[1] ] = move_data[ 'capture' ]
+
+    def ChangeBoardPosition( self, location ):
+        while self.move_history_location != location:
+            if self.move_history_location < location:
+                self.MakeMove( self.move_history[ self.move_history_location ][ 'move' ], False )
+                self.move_history_location += 1
+            elif self.move_history_location > location:
+                self.move_history_location -= 1
+                self.UnmakeMove( self.move_history[ self.move_history_location ] )
 
     def EveryTileLocation( self ):
         for i in range( 0, 8 ):
@@ -283,10 +339,13 @@ class ChessApp( object ):
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def game_state( self, **kwargs ):
-        game_name = kwargs[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name': game_name } )
-        if not game_doc:
-            return { 'error' : 'A game by the name "%s" could not be found.' % game_name }
+        try:
+            game_name = kwargs[ 'game_name' ]
+            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+            if not game_doc:
+                return { 'error' : 'A game by the name "%s" could not be found.' % game_name }
+        except Exception as ex:
+            return { 'error': str(ex) }
         return { 'game_state': game_doc[ 'game_data' ] }
 
     @cherrypy.expose
@@ -364,6 +423,19 @@ class ChessApp( object ):
             return { 'kill_move_list': kill_move_list }
         except Exception as ex:
             return { 'error': str(ex) }
+
+    @cherrypy.expose
+    @cherrypy.tools.json_out()
+    def change_board_location( self, **kwargs ):
+        try:
+            game, payload = self.GetGameFromPayload()
+            game.ChangeBoardPosition( payload[ 'location' ] )
+            game_data = game.Serialize()
+            result = self.game_collection.update_one( { 'game_name': payload[ 'game_name' ] }, { '$set': { 'game_data': game_data } } )
+            result = None
+        except Exception as ex:
+            return { 'error': str(ex) }
+        return {}
 
 class ComputerPlayer( object ):
     def __init__( self ):
