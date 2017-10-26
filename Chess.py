@@ -132,13 +132,15 @@ class ChessGame( object ):
                 move_intermediate[1] += col_delta
         if castling:
             if source_occupant == self.WHITE_KING and target_occupant == self.WHITE_ROOK:
-                for prev_move in self.move_history:
+                for i in range( 0, self.move_history_location ):
+                    prev_move = self.move_history[i]
                     if prev_move[ 'move' ][ 'source' ][0] == 7 and prev_move[ 'move' ][ 'source' ][1] == 4:
                         raise Exception( 'A king can only castle if it has never before moved.' )
                     # TODO: The rook involved must not have previously moved.
                 # TODO: The king cannot be in check, nor can castling put it in check.
             elif source_occupant == self.BLACK_KING and target_occupant == self.BLACK_ROOK:
-                for prev_move in self.move_history:
+                for i in range( 0, self.move_history_location ):
+                    prev_move = self.move_history[i]
                     if prev_move[ 'move' ][ 'source' ][0] == 0 and prev_move[ 'move' ][ 'source' ][1] == 4:
                         raise Exception( 'A king can only castle if it has never before moved.' )
                     # TODO: The rook involved must not have previously moved.
@@ -207,8 +209,11 @@ class ChessGame( object ):
                 self.matrix[ move_target[0] ][ move_target[1] ] = move_data[ 'capture' ]
             else:
                 self.matrix[ move_target[0] ][ move_target[1] ] = self.EMPTY
+            color = self.ColorOfOccupant( move_data[ 'actor' ] )
+            self.whose_turn = self.WHITE_PLAYER if color == self.WHITE_PLAYER else self.BLACK_PLAYER
         else:
             if move_source[0] == 7:
+                self.whose_turn = self.WHITE_PLAYER
                 if move_target[1] == 7: # White king castles right side.
                     self.matrix[7][6] = self.EMPTY
                     self.matrix[7][5] = self.EMPTY
@@ -216,6 +221,7 @@ class ChessGame( object ):
                     self.matrix[7][2] = self.EMPTY
                     self.matrix[7][3] = self.EMPTY
             elif move_source[0] == 0:
+                self.whose_turn = self.BLACK_PLAYER
                 if move_target[1] == 7: # Black king castled right side.
                     self.matrix[0][6] = self.EMPTY
                     self.matrix[0][5] = self.EMPTY

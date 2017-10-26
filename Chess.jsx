@@ -291,11 +291,10 @@ var MoveToNotation = function( move ) {
 class ChessBoardHistoryBox extends React.Component {
     constructor( props ) {
         super( props );
+        this.scroll_div = undefined;
     }
 
     // TODO: How do we click to have the last item applied?  Maybe have some |< < > >| buttons?
-    // TODO: Keep the list scrolled to the bottom.
-    // TODO: There are some bugs still with this.  ("Piece can't be moved on this turn." happens.)  Oh, I need to adjust whose turn it is when changing the board position, doh!
     OnItemClicked( evt ) {
         let id = evt.target.id;
         let loc = /history_box_item_([0-9]+)/g.exec( id );
@@ -315,6 +314,26 @@ class ChessBoardHistoryBox extends React.Component {
         } );
     }
 
+    ScrollToBottom() {
+        let box_div = this.refs.box;
+        if( this.scroll_div !== undefined ) {
+            let element = document.getElementById( this.scroll_div.props.id );
+            if( element ) {
+                element.scrollIntoView( true );
+            }
+        } else {
+            box_div.scrollTop = box_div.scrollHeight;
+        }
+    }
+
+    componentDidMount() {
+        this.ScrollToBottom();
+    }
+
+    componentDidUpdate() {
+        this.ScrollToBottom();
+    }
+
     render() {
         let move_history = this.props.move_history;
         let item_anchor_array = [];
@@ -324,10 +343,17 @@ class ChessBoardHistoryBox extends React.Component {
             if( i === this.props.move_history_location ) {
                 classStr += ' history_box_item_highlighted';
             }
-            item_anchor_array.push( <a id={"history_box_item_"+i.toString()} className={classStr}>{MoveToNotation(move)}</a> );
+            if( i % 2 === 1 ) {
+                classStr += ' history_box_item_odd';
+            }
+            let item_div = <a id={"history_box_item_"+i.toString()} className={classStr}>{MoveToNotation(move)}</a>;
+            item_anchor_array.push( item_div );
+            if( i === this.props.move_history_location ) {
+                this.scroll_div = item_div;
+            }
             i++;
         } );
-        return React.createElement( 'div', { id: "history_box", onClick: this.OnItemClicked.bind(this) }, ...item_anchor_array );
+        return React.createElement( 'div', { id: "history_box", onClick: this.OnItemClicked.bind(this), ref: 'box' }, ...item_anchor_array );
     }
 }
 

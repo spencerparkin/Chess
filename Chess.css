@@ -22,18 +22,24 @@ select {
     flex-grow: 100; /* This doesn't work. :( */
     height: 800px;
     width: 350px; /* Do this for now. */
-    background-color: red;
+    background-color: white;
     border: 5px solid white;
     overflow-y: auto;
+    border-radius: 5px;
 }
 
 .history_box_item {
-    background-color: green;
+    background-color: lightgrey;
     color: black;
     display: block;
     padding: 5px;
     text-decoration: none;
     cursor: pointer;
+    border-radius: 5px;
+}
+
+.history_box_item_odd {
+    background-color: grey;
 }
 
 .history_box_item_highlighted {
@@ -41,7 +47,7 @@ select {
 }
 
 .history_box_item:hover {
-    background-color: blue;
+    background-color: lightblue;
 }
 
 .tile_move_good {
