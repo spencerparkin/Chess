@@ -6,6 +6,7 @@ import pymongo
 import json
 import copy
 import random
+import time
 
 class ChessGame( object ):
     EMPTY = 0
@@ -247,19 +248,21 @@ class ChessGame( object ):
             for j in range( 0, 8 ):
                 yield [ i, j ]
 
-    def GenerateValidMoveList( self, source_loc ):
-        valid_move_list = []
+    def GenerateValidMovesForLocation( self, source_loc ):
         for target_loc in self.EveryTileLocation():
             move = { 'source' : source_loc, 'target' : target_loc }
             try:
                 self.ValidMove( move )
-                valid_move_list.append( move )
-            except:
+                yield move
+            except: # TODO: Really should catch specific "invalid move" exception here.
                 pass
-        return valid_move_list
+    
+    def GenerateAllValidMoves( self ):
+        for source_loc in self.EveryTileLocation():
+            yield from self.GenerateValidMovesForLocation( source_loc )
 
     def GenerateKillMoveList( self, source_loc ):
-        valid_move_list = self.GenerateValidMoveList( source_loc )
+        valid_move_list = [ move for move in self.GenerateValidMovesForLocation( source_loc ) ]
         kill_move_list = [ move for move in valid_move_list if self.matrix[ move[ 'target' ][0] ][ move[ 'target' ][1] ] != self.EMPTY ]
         return kill_move_list
 
@@ -417,7 +420,7 @@ class ChessApp( object ):
     def all_valid_moves( self, **kwargs ):
         try:
             game, payload = self.GetGameFromPayload()
-            valid_move_list = game.GenerateValidMoveList( payload[ 'location' ] )
+            valid_move_list = [ move for move in game.GenerateValidMovesForLocation( payload[ 'location' ] ) ]
             return { 'valid_move_list': valid_move_list }
         except Exception as ex:
             return { 'error': str(ex) }
@@ -446,67 +449,59 @@ class ChessApp( object ):
         return {}
 
 class ComputerPlayer( object ):
+    MINIMIZER = 0
+    MAXIMIZER = 1
+    
     def __init__( self ):
         pass
 
-    # TODO: Optimize this with alpha-beta pruning.
-    # Here we implement the mini-max algorithm.
+    # Here we implement the mini-max algorithm with what I think might be valid alpha-beta pruning.
     def DetermineReasonableMove( self, game ):
-        try:
-            max_depth = 3
-            count = 0
-            for loc in game.EveryTileLocation():
-                if game.matrix[ loc[0] ][ loc[1] ] != ChessGame.EMPTY:
-                    count += 1
-            if count <= 6:
-                # This helps us recognize some check-mate situations that we wouldn't otherwise recognize.
-                max_depth = 4
-            move = self.DetermineReasonableMoveRecursively( game, max_depth )
-        except Exception as ex:
-            raise ex
+        seed = int( time.time() )
+        random.seed( seed )
+        move = self.CalculateReasonableMove( game )
         return move
 
-    def DetermineReasonableMoveRecursively( self, game, max_depth = 3, depth = 1 ):
+    # TODO: Is alpha-beta pruning enough for us to go to max_depth of 4?  If not, we might have to use threads.
+    #       Many situations not caught by depth 3 are handled by depth 4.  One of them is a possible check mate,
+    #       as I'm sure is the case with many others.
+    def CalculateReasonableMove( self, game, parent_bound = None, max_depth = 3, depth = 1 ):
         if depth == max_depth:
             return game.Metric()
         else:
-            valid_move_list = []
-            for source_loc in game.EveryTileLocation():
-                valid_move_list += game.GenerateValidMoveList( source_loc )
-            metric_list = []
-            for move in valid_move_list:
+            type = -1
+            if game.whose_turn == ChessGame.WHITE_PLAYER:
+                type = self.MAXIMIZER
+            elif game.whose_turn == ChessGame.BLACK_PLAYER:
+                type = self.MINIMIZER
+            child_bound = None
+            optimal_metric = 0
+            if type == 'maximizer':
+                optimal_metric = -999999
+            elif type == 'minimizer':
+                optimal_metric = 999999
+            if depth == 1:
+                best_move_list = []
+            for move in game.GenerateAllValidMoves():
                 game_copy = copy.deepcopy( game )
                 game_copy.MakeMove( move )
-                metric = self.DetermineReasonableMoveRecursively( game_copy, max_depth, depth + 1 )
-                metric_list.append( metric )
-            max = -999999.0
-            min = 999999.0
-            for i in range( len( metric_list ) ):
-                metric = metric_list[i]
-                if metric > max:
-                    max = metric
-                if metric < min:
-                    min = metric
-            metric = None
-            if game.whose_turn == ChessGame.WHITE_PLAYER:
-                metric = max
-            elif game.whose_turn == ChessGame.BLACK_PLAYER:
-                metric = min
-            i = self.ChooseRandom( metric_list, metric )
+                metric = self.CalculateReasonableMove( game_copy, child_bound, max_depth, depth + 1 )
+                if ( type == self.MAXIMIZER and metric > optimal_metric ) or ( type == self.MINIMIZER and metric < optimal_metric ):
+                    optimal_metric = metric
+                    child_bound = optimal_metric
+                    if depth == 1:
+                        best_move_list = [ move ]
+                    if parent_bound is not None:
+                        if ( type == self.MAXIMIZER and metric > parent_bound ) or ( type == self.MINIMIZER and metric < parent_bound ):
+                            break # We have discovered that this branch is now not worth processing further!!
+                elif depth == 1 and metric == optimal_metric:
+                    best_move_list.append( move )
             if depth > 1:
-                return metric_list[i]
-            return valid_move_list[i]
-
-    def ChooseRandom( self, metric_list, metric ):
-        index_list = []
-        for i in range( len( metric_list ) ):
-            if metric_list[i] == metric:
-                index_list.append(i)
-        j = random.randint( 0, len( index_list ) - 1 )
-        return index_list[j]
+                return optimal_metric
+            i = random.randint( 0, len( best_move_list ) - 1 )
+            return best_move_list[i]
 
 if __name__ == '__main__':
-    # TODO: Seed random number generator.
 
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
     port = int( os.environ.get( 'PORT', 5100 ) )
