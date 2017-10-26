@@ -280,7 +280,7 @@ var MoveToNotation = function( move ) {
     if( move.capture ) {
         i = move.capture < 7 ? move.capture - 1 : move.capture - 7;
         piece_name = piece_array[i];
-        result += ' captures ' + piece_name + ' at ';
+        result += ' takes ' + piece_name + ' at ';
     } else {
         result += ' moves to ';
     }
