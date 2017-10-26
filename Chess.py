@@ -64,6 +64,8 @@ class ChessGame( object ):
 
     def ValidMove( self, move, whose_turn = None ):
         # TODO: Ugh...En passant?!  How are we going to implement this move?
+        # TODO: Another rule not observed here is that of stale-mate.  And perhaps more generally,
+        #       the king is not allowed to move into a position where it would be in check, I think.
         if whose_turn is None:
             whose_turn = self.whose_turn
         move_source = move[ 'source' ]
