@@ -93,8 +93,13 @@ class ChessGame( object ):
         row_diff = move_target[0] - move_source[0]
         col_diff = move_target[1] - move_source[1]
         if source_occupant == self.WHITE_KING or source_occupant == self.BLACK_KING:
-            if abs( row_diff ) > 1 or abs( col_diff ) > 1 and not castling:
-                raise Exception( 'The king cannot move that far.' )
+            if not castling:
+                if abs( row_diff ) > 1 or abs( col_diff ) > 1:
+                    raise Exception( 'The king cannot move that far.' )
+                # Ugh...is this going to infinitely recurse in some cases?  E.g., two kings right next to each other?
+                threat_list = self.ThreatListToLocation( move_target, self.WHITE_PLAYER if whose_turn == self.BLACK_PLAYER else self.WHITE_PLAYER )
+                if len( threat_list ) > 0:
+                    raise Exception( 'The king cannot put itself in check.' )
         elif source_occupant == self.WHITE_QUEEN or source_occupant == self.BLACK_QUEEN:
             if abs( row_diff ) != 0 and abs( col_diff ) != 0 and abs( row_diff ) != abs( col_diff ):
                 raise Exception( 'The queen can only move on diagonals or orthogonals.' )
@@ -277,12 +282,13 @@ class ChessGame( object ):
     def ThreatListToLocation( self, target_loc, whose_turn ):
         threat_list = []
         for source_loc in self.EveryTileLocation():
-            move = { 'source' : source_loc, 'target' : target_loc }
-            try:
-                self.ValidMove( move, whose_turn )
-                threat_list.append( source_loc )
-            except:
-                pass
+            if self.ColorOfOccupant( self.matrix[ source_loc[0] ][ source_loc[1] ] ) == whose_turn:
+                move = { 'source' : source_loc, 'target' : target_loc }
+                try:
+                    self.ValidMove( move, whose_turn )
+                    threat_list.append( source_loc )
+                except:
+                    pass
         return threat_list
 
     def Metric( self ):
@@ -300,6 +306,11 @@ class ChessGame( object ):
         sum += 3.0 * float( counts[ self.WHITE_KNIGHT ] - counts[ self.BLACK_KNIGHT ] )
         sum += float( counts[ self.WHITE_PAWN ] - counts[ self.BLACK_PAWN ] )
         # TODO: sum -= 0.5 * ( D-D' + S-S' + I-I' ) # doubled, blocked & isolated pawns
+        # This mobility part of the sum may make the difference between putting the player
+        # in check versus putting the player in check-mate, because it is not legal for the
+        # king to move into a position that puts it in check.  I've seen the computer pass
+        # up an opportunity to put the player in check-mate.  I might also just look for
+        # the check-mate condition here and then add a big score for that.
         # TODO: sum += 0.1 * ( M-M' ) + ... # mobility (the number of legal moves per piece?)
         return sum
 
