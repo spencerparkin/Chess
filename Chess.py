@@ -246,7 +246,10 @@ class ChessGame( object ):
     def EveryTileLocation( self ):
         for i in range( 0, 8 ):
             for j in range( 0, 8 ):
-                yield [ i, j ]
+                try:
+                    yield [ i, j ]
+                except GeneratorExit:
+                    return
 
     def GenerateValidMovesForLocation( self, source_loc ):
         for target_loc in self.EveryTileLocation():
@@ -254,12 +257,17 @@ class ChessGame( object ):
             try:
                 self.ValidMove( move )
                 yield move
+            except GeneratorExit:
+                return
             except: # TODO: Really should catch specific "invalid move" exception here.
                 pass
     
     def GenerateAllValidMoves( self ):
         for source_loc in self.EveryTileLocation():
-            yield from self.GenerateValidMovesForLocation( source_loc )
+            try:
+                yield from self.GenerateValidMovesForLocation( source_loc )
+            except GeneratorExit:
+                return
 
     def GenerateKillMoveList( self, source_loc ):
         valid_move_list = [ move for move in self.GenerateValidMovesForLocation( source_loc ) ]
@@ -459,13 +467,23 @@ class ComputerPlayer( object ):
     def DetermineReasonableMove( self, game ):
         seed = int( time.time() )
         random.seed( seed )
-        move = self.CalculateReasonableMove( game )
+        try:
+            move = self.CalculateReasonableMove( game )
+        except Exception as ex:
+            error = str(ex)
+            error = None
         return move
 
     # TODO: Is alpha-beta pruning enough for us to go to max_depth of 4?  If not, we might have to use threads.
     #       Many situations not caught by depth 3 are handled by depth 4.  One of them is a possible check mate,
     #       as I'm sure is the case with many others.
-    def CalculateReasonableMove( self, game, parent_bound = None, max_depth = 3, depth = 1 ):
+    # TODO: I'm not sure if this re-write made the computer dumber or even dumber than that.
+    #       First of all, if we remove the alpha-beta optimization (by commenting out the appropriate lines),
+    #       is this a valid implementation of mini-max?  Second, is the algorithm still correct when we put
+    #       the optimization back in?  One way to test this may be to run it twice: once with and once without
+    #       the optimization code enabled.  Do we always get the same result?
+    # TODO: Have option for choosing between depth 3 and depth 4?  (Easy vs. hard?)
+    def CalculateReasonableMove( self, game, parent_bound = None, max_depth = 4, depth = 1 ):
         if depth == max_depth:
             return game.Metric()
         else:
@@ -476,9 +494,9 @@ class ComputerPlayer( object ):
                 type = self.MINIMIZER
             child_bound = None
             optimal_metric = 0
-            if type == 'maximizer':
+            if type == self.MAXIMIZER:
                 optimal_metric = -999999
-            elif type == 'minimizer':
+            elif type == self.MINIMIZER:
                 optimal_metric = 999999
             if depth == 1:
                 best_move_list = []
