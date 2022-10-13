@@ -266,7 +266,7 @@ class ChessGame( object ):
                 return
             except: # TODO: Really should catch specific "invalid move" exception here.
                 pass
-    
+
     def GenerateAllValidMoves( self ):
         for source_loc in self.EveryTileLocation():
             try:
@@ -314,19 +314,74 @@ class ChessGame( object ):
         # TODO: sum += 0.1 * ( M-M' ) + ... # mobility (the number of legal moves per piece?)
         return sum
 
-class ChessApp( object ):
-    def __init__( self, root_dir ):
-        self.root_dir = root_dir
+# No real need for a common base.  We can use duck-typing, but I like a common base out of principle.
+class Database(object):
+    def __init__(self):
+        pass
+
+class MongoDatabase(Database):
+    def __init__(self):
+        self.mongo_client = None
         try:
             database_uri = 'mongodb://heroku_8m3rxx28:jdsoru7vb5dq6m3q5c4klcu0ba@ds121665.mlab.com:21665/heroku_8m3rxx28'
-            self.mongo_client = pymongo.MongoClient( database_uri )
-            self.database = self.mongo_client[ 'heroku_8m3rxx28' ]
+            self.mongo_client = pymongo.MongoClient(database_uri)
+            self.database = self.mongo_client['heroku_8m3rxx28']
             collection_names = self.database.collection_names()
             if not 'game_collection' in collection_names:
-                self.database.create_collection( 'game_collection' )
-            self.game_collection = self.database[ 'game_collection' ]
+                self.database.create_collection('game_collection')
+            self.game_collection = self.database['game_collection']
         except:
             self.mongo_client = None
+
+    def find_game(self, game_name):
+        return self.game_collection.find_one({'game_name': game_name})
+
+    def insert_game(self, game_name, game_data):
+        game_doc = {
+            'game_name' : game_name,
+            'game_data' : game_data
+        }
+        self.game_collection.insert_one(game_doc)
+
+    def delete_game(self, game_name):
+        self.game_collection.delete_one({'game_name': game_name})
+
+    def get_game_list(self):
+        cursor = self.game_collection.find({})
+        game_list = [game_doc['game_name'] for game_doc in cursor]
+        return game_list
+
+    def update_game(self, game_name, game_data):
+        result = self.game_collection.update_one( { 'game_name': game_name }, { '$set' : { 'game_data' : game_data } } )
+        result = None
+
+class CacheDatabase(Database):
+    def __init__(self):
+        self.game_collection = {}
+
+    def find_game(self, game_name):
+        return self.game_collection[game_name] if game_name in self.game_collection else None
+
+    def insert_game(self, game_name, game_data):
+        self.game_collection[game_name] = game_data
+
+    def delete_game(self, game_doc):
+        if game_doc in self.game_collection:
+            del self.game_colletion[game_doc]
+
+    def get_game_list(self):
+        return [game_name for game_name in self.game_collection]
+
+    def udpate_game(self, game_name, game_data):
+        self.game_collection[game_name] = game_data
+
+class ChessApp( object ):
+    def __init__( self, root_dir, mongo_backed ):
+        self.root_dir = root_dir
+        if mongo_backed:
+            self.db = MongoDatabase()
+        else:
+            self.db = CacheDatabase()
 
     @cherrypy.expose
     def default( self, **kwargs ):
@@ -338,32 +393,27 @@ class ChessApp( object ):
     @cherrypy.tools.json_out()
     def new_game( self, **kwargs ):
         game_name = kwargs[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name' : game_name } )
+        game_doc = self.db.find_game(game_name)
         if game_doc:
             return { 'error' : 'A game by the name "%s" already exists.' % game_name }
         game_data = ChessGame().Serialize()
-        game_doc = {
-            'game_name' : game_name,
-            'game_data' : game_data
-        }
-        result = self.game_collection.insert_one( game_doc )
+        self.db.insert_game(game_name, game_data)
         return {}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def delete_game( self, **kwargs ):
         game_name = kwargs[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+        game_doc = self.db.find_game(game_name)
         if not game_doc:
             return { 'error' : 'A game by the name "%s" could not be found.' % game_name }
-        result = self.game_collection.delete_one( { 'game_name' : game_name } )
+        result = self.db.delete_game(game_name)
         return {}
 
     @cherrypy.expose
     @cherrypy.tools.json_out()
     def game_list( self, **kwargs ):
-        cursor = self.game_collection.find( {} )
-        game_list = [ game_doc[ 'game_name' ] for game_doc in cursor ]
+        game_list = self.db.get_game_list()
         return { 'game_list' : game_list }
 
     @cherrypy.expose
@@ -371,7 +421,7 @@ class ChessApp( object ):
     def game_state( self, **kwargs ):
         try:
             game_name = kwargs[ 'game_name' ]
-            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+            game_doc = self.db.find_game(game_name)
             if not game_doc:
                 return { 'error' : 'A game by the name "%s" could not be found.' % game_name }
         except Exception as ex:
@@ -382,7 +432,7 @@ class ChessApp( object ):
     @cherrypy.tools.json_out()
     def whose_turn( self, **kwargs ):
         game_name = kwargs[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name' : game_name } )
+        game_doc = self.db.find_game(game_name)
         if game_doc:
             return { 'whose_turn' : game_doc[ 'game_data' ][ 'whose_turn' ] }
         return {}
@@ -393,7 +443,7 @@ class ChessApp( object ):
         payload = payload.decode( 'utf-8' )
         payload = json.loads( payload )
         game_name = payload[ 'game_name' ]
-        game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+        game_doc = self.db.find_game(game_name)
         if not game_doc:
             raise Exception( 'A game by the name "%s" could not be found.' % game_name )
         game = ChessGame()
@@ -410,8 +460,8 @@ class ChessApp( object ):
             move = payload[ 'move' ]
             game.MakeMove( move )
             game_data = game.Serialize()
-            result = self.game_collection.update_one( { 'game_name': payload[ 'game_name' ] }, { '$set' : { 'game_data' : game_data } } )
-            result = None
+            game_name = payload['game_name']
+            self.db.update_game(game_name, game_data)
         except Exception as ex:
             return { 'error' : str(ex) }
         return {}
@@ -421,15 +471,14 @@ class ChessApp( object ):
     def make_computer_move( self, **kwargs ):
         try:
             game_name = kwargs[ 'game_name' ]
-            game_doc = self.game_collection.find_one( { 'game_name': game_name } )
+            game_doc = self.db.find_game(game_name)
             game = ChessGame()
             game.Deserialize( game_doc[ 'game_data' ] )
             computer_player = ComputerPlayer()
             move = computer_player.DetermineReasonableMove( game )
             game.MakeMove( move )
             game_data = game.Serialize()
-            result = self.game_collection.update_one( { 'game_name' : game_name }, { '$set' : { 'game_data' : game_data } } )
-            result = None
+            self.db.update_game(game_name, game_data)
         except Exception as ex:
             return { 'error' : str(ex) }
         return {}
@@ -461,8 +510,8 @@ class ChessApp( object ):
             game, payload = self.GetGameFromPayload()
             game.ChangeBoardPosition( payload[ 'location' ] )
             game_data = game.Serialize()
-            result = self.game_collection.update_one( { 'game_name': payload[ 'game_name' ] }, { '$set': { 'game_data': game_data } } )
-            result = None
+            game_name = payload['game_name']
+            self.db.update_game(game_name, game_data)
         except Exception as ex:
             return { 'error': str(ex) }
         return {}
@@ -470,7 +519,7 @@ class ChessApp( object ):
 class ComputerPlayer( object ):
     MINIMIZER = 0
     MAXIMIZER = 1
-    
+
     def __init__( self ):
         pass
 
@@ -535,7 +584,7 @@ if __name__ == '__main__':
     root_dir = os.path.dirname( os.path.abspath( __file__ ) )
     port = int( os.environ.get( 'PORT', 5100 ) )
 
-    app = ChessApp( root_dir )
+    app = ChessApp( root_dir, False )
 
     app_config = {
         'global': {
